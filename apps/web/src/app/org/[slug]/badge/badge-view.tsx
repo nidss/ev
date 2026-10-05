@@ -28,7 +28,7 @@ export function BadgeView() {
           {a.company && <div className="mt-2 text-muted">{a.company}</div>}
           <QrSvg value={a.qrToken} className="mx-auto mt-4 h-40 w-40 p-1" />
           <div className="mt-2 font-mono text-sm">{a.ticketCode}</div>
-          <div className="mt-3 inline-block rounded-full bg-brand/10 px-3 py-1 text-sm font-semibold text-brand">{tt.name[locale]}</div>
+          <div className="mt-3 inline-block rounded-full bg-brand-soft px-3 py-1 text-sm font-semibold text-brand">{tt.name[locale]}</div>
         </div>
       </div>
       <PrintButton />

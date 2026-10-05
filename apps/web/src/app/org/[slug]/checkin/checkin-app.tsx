@@ -290,7 +290,7 @@ export function CheckinApp(props: {
 
       {(offline || queue.length > 0 || syncMsg) && (
         <div
-          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm ${offline ? "bg-slate-800 text-white" : "bg-brand/10 text-brand"}`}
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm ${offline ? "bg-slate-800 text-white" : "bg-brand-soft text-brand"}`}
         >
           <span>
             {offline ? t.offlineBar(queue.length) : syncMsg ?? t.pending(queue.length)}

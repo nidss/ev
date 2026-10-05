@@ -216,7 +216,7 @@ function Meter({ value, max }: { value: number; max: number }) {
   const ratio = max > 0 ? Math.min(1, value / max) : 0;
   return (
     <div
-      className="h-2 w-full overflow-hidden rounded-full bg-brand/15"
+      className="h-2 w-full overflow-hidden rounded-full bg-brand-track"
       role="meter"
       aria-valuenow={value}
       aria-valuemin={0}

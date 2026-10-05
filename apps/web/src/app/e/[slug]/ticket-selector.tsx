@@ -239,7 +239,7 @@ export function TicketSelector(props: {
                 go({ round: r.date });
               }}
               className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                selected ? "border-brand bg-brand/10" : "border-line bg-surface hover:border-brand"
+                selected ? "border-brand bg-brand-soft" : "border-line bg-surface hover:border-brand"
               }`}
             >
               <span className="block text-sm font-semibold">{r.label}</span>

@@ -210,7 +210,7 @@ export function CheckoutForm(props: {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-bold">{phase === "info" ? t.checkout : t.reviewTitle}</h1>
             <span
-              className={`rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${secondsLeft < 120 ? "bg-red-100 text-red-700" : "bg-brand/10 text-brand"}`}
+              className={`rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${secondsLeft < 120 ? "bg-red-100 text-red-700" : "bg-brand-soft text-brand"}`}
             >
               ⏱ {t.timeLeft} {mm}:{ss}
             </span>
@@ -385,7 +385,7 @@ export function CheckoutForm(props: {
                     ).map(([value, label, icon]) => (
                       <label
                         key={value}
-                        className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm ${method === value ? "border-brand bg-brand/5" : "border-line"}`}
+                        className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm ${method === value ? "border-brand bg-brand-softer" : "border-line"}`}
                       >
                         <input type="radio" name="method" checked={method === value} onChange={() => setMethod(value)} />
                         <span aria-hidden>{icon}</span>
@@ -424,7 +424,7 @@ export function CheckoutForm(props: {
                 {t.promo}
               </label>
               {promo ? (
-                <div className="flex items-center justify-between rounded-lg bg-brand/10 px-3 py-2 text-sm text-brand">
+                <div className="flex items-center justify-between rounded-lg bg-brand-soft px-3 py-2 text-sm text-brand">
                   <span>{t.promoApplied(`${promo.code} · ${promo.label}`)}</span>
                   <button type="button" className="text-xs underline" onClick={() => applyPromo(null)}>
                     {t.remove}
