@@ -2,6 +2,7 @@
 
 อ้างอิง feature จาก [FEATURES.md](./FEATURES.md) — เอกสารนี้ครอบคลุม Phase 1 (MVP) เป็นหลัก
 และเผื่อโครงสร้างไว้สำหรับ Phase 2–3
+ระบบซื้อบัตร (order, รอบ, การชำระเงิน) แยกรายละเอียดไว้ที่ [TICKETING.md](./TICKETING.md)
 
 ---
 
@@ -11,16 +12,17 @@
 
 ```
 ┌──────────────────────────── Next.js app (TypeScript) ─────────────────────────────┐
-│  /register/*     หน้าลงทะเบียน attendee (SSR, หลายภาษา)                              │
+│  /e/:slug/*      หน้างาน + เลือกบัตร/รอบ + checkout ซื้อบัตร (SSR, หลายภาษา)              │
 │  /t/*            e-ticket + หน้า "บัตรของฉัน" (attendee)                              │
 │  /b/:boothCode   หน้า sponsor เมื่อ attendee สแกน QR บูธ                             │
 │  /scan           PWA สแกน (staff เช็คอิน + staff บูธ) — ทำงาน offline               │
 │  /org/*          Organizer console + dashboard                                     │
 │  /sponsor/*      Sponsor portal (ดู/export lead)                                   │
-│  /api/*          REST API (route handlers) + /api/sync สำหรับเครื่องสแกน             │
+│  /api/*          REST API + /api/sync (เครื่องสแกน) + /api/payments/webhook          │
 └───────────────┬───────────────────────────────────────────────┬───────────────────┘
                 │                                               │
         PostgreSQL (ข้อมูลหลัก)                       Worker (BullMQ บน Redis)
+        รวม order/payment/ความจุรอบ                    ปล่อยที่นั่ง order หมดเวลา, reconcile payment,
                 │                                     ส่ง email/LINE, สร้าง Wallet pass,
            Redis (cache counter                       import Excel, สร้าง report/export
            dashboard, pub/sub realtime)                         │
@@ -46,6 +48,7 @@
 | QR token | signed token (**Ed25519**, ไลบรารี `@noble/ed25519`) | เครื่องสแกนตรวจลายเซ็นได้เองแม้ offline (ถือ public key) |
 | Background jobs | **BullMQ + Redis** | ส่ง email/LINE จำนวนมาก, retry อัตโนมัติ |
 | Realtime dashboard | Redis counter + **Server-Sent Events** | เบากว่า WebSocket, พอสำหรับตัวเลขที่อัปเดตทางเดียว |
+| Payment | gateway ไทย (**Opn Payments/Omise**, 2C2P หรือ GB Prime Pay — ยังไม่เลือก) ผ่าน interface `PaymentProvider` | บัตรเครดิต, PromptPay, Mobile Banking ในเจ้าเดียว; เปลี่ยนเจ้าได้ |
 | Email | **Amazon SES** (หรือ Resend) | ส่งหลักหมื่นฉบับได้ถูก |
 | LINE | LINE Messaging API (Phase 1: ส่งบัตร, Phase 2: OA เต็มรูปแบบ) | คนไทยเปิด LINE มากกว่า email |
 | Wallet | `passkit-generator` (Apple), Google Wallet API | Add to Wallet |
@@ -66,7 +69,7 @@ ev/
 │  └─ worker/           BullMQ worker (email, LINE, wallet, import, export, report)
 ├─ packages/
 │  ├─ db/               Drizzle schema, migrations, views, seed
-│  ├─ core/             business logic (registration, checkin, lead, consent) — ไม่ผูก framework
+│  ├─ core/             business logic (registration, order, payment, checkin, lead, consent) — ไม่ผูก framework
 │  ├─ qr/               สร้าง/ตรวจ signed token (ใช้ทั้ง server และเครื่องสแกน)
 │  └─ i18n/             ข้อความทุกภาษา
 └─ docs/
@@ -93,6 +96,12 @@ erDiagram
     users ||--o{ org_members : "is"
     organizations ||--o{ events : runs
     events ||--o{ ticket_types : defines
+    events ||--o{ time_slots : "sells by"
+    events ||--o{ orders : receives
+    orders ||--o{ order_items : contains
+    orders ||--o{ payments : "paid by"
+    orders ||--o{ attendees : issues
+    time_slots ||--o{ attendees : "valid for"
     events ||--o{ form_fields : defines
     events ||--o{ consent_texts : defines
     events ||--o{ attendees : registers
@@ -176,9 +185,9 @@ erDiagram
 | name | i18n | |
 | kind | enum | `general` \| `vip` \| `staff` \| `press` \| `speaker` |
 | quota | int | null = ไม่จำกัด |
-| issued_count | int | นับไว้ล่วงหน้าเพื่อเช็ค quota เร็ว (อัปเดตใน transaction เดียวกับการลงทะเบียน) |
+| taken | int | จองไว้ + ออกแล้ว — นับไว้ล่วงหน้าเพื่อเช็ค quota เร็ว (อัปเดตใน transaction เดียวกับการจอง) |
 | is_public | bool | false = ออกให้ได้เฉพาะ import/organizer (เช่น staff, press) |
-| price_satang | int | Phase 2 (ขายบัตร) — Phase 1 เป็น 0 |
+| price_satang | int | ราคา (0 = ฟรี) — column ขายบัตรอื่นๆ ดู [TICKETING.md §8.2](./TICKETING.md#82-เพิ่ม-column-ใน-ticket_types) |
 | badge_color | text | สีบน badge |
 | sort_order | int | |
 
@@ -203,17 +212,20 @@ erDiagram
 
 ### 2.3 Attendee และ consent
 
-**`attendees`** — 1 แถว = 1 คน ต่อ 1 งาน = 1 บัตร
+**`attendees`** — 1 แถว = 1 คน ต่อ 1 งาน = 1 บัตร (บัตรที่ซื้อเกิดจาก order ที่จ่ายแล้ว — ดู [TICKETING.md §8.4](./TICKETING.md#84-เปลี่ยน-attendees--บัตร-1-ใบ))
 
 | column | type | หมายเหตุ |
 |---|---|---|
 | id | uuid | |
 | event_id | uuid | |
 | ticket_type_id | uuid | |
+| order_id, order_item_id | uuid | null สำหรับ import / organizer ออกให้ |
+| slot_id | uuid | รอบที่บัตรใช้ได้ |
+| holder_status | enum | `assigned` \| `unassigned` (รอเจ้าของบัตรกรอกข้อมูล) |
 | ticket_code | text | รหัสสั้นอ่านได้ เช่น `EV-7K2Q-9MXD` — unique ต่อ event, ใช้ค้นหน้างานกรณีสแกนไม่ได้ |
 | qr_version | int | เพิ่มเมื่อออกบัตรใหม่ → QR เก่าใช้ไม่ได้ |
 | first_name, last_name | text | |
-| email | citext | unique `(event_id, email)` เมื่อไม่ null |
+| email | citext | ไม่ unique แล้ว (ซื้อหลายใบ/หลายรอบได้) — กันซ้ำเฉพาะ ticket type ที่ `one_per_person` |
 | phone | text | รูปแบบ E.164, ไม่บังคับ (ต่างชาติไม่มีเบอร์ไทย) |
 | nationality | char(2) | ISO 3166-1 |
 | id_doc_type | enum | `thai_id` \| `passport` \| `other` \| null |
@@ -222,14 +234,14 @@ erDiagram
 | company, job_title | text | |
 | locale | text | ภาษาที่ใช้ส่งบัตร/ข้อความ |
 | answers | jsonb | คำตอบฟิลด์ custom `{ "interests": ["fintech"], ... }` |
-| source | enum | `online` \| `import` \| `walk_in` \| `organizer` |
+| source | enum | `online` \| `import` \| `walk_in` \| `box_office` \| `organizer` |
 | import_batch_id | uuid | null ได้ |
-| status | enum | `registered` \| `cancelled` |
+| status | enum | `registered` \| `cancelled` \| `refunded` |
 | first_checked_in_at | timestamptz | denormalize จาก `checkins` เพื่อให้ dashboard/รายชื่อเร็ว |
 | line_user_id | text | ถ้าผูก LINE |
 | anonymized_at | timestamptz | ลบข้อมูลส่วนบุคคลแล้ว |
 
-Index: `(event_id, status)`, `(event_id, ticket_code)` unique, `(event_id, lower(last_name), lower(first_name))`, `(event_id, id_doc_number_hash)`
+Index: `(event_id, status)`, `(event_id, slot_id)`, `(order_id)`, `(event_id, ticket_code)` unique, `(event_id, lower(last_name), lower(first_name))`, `(event_id, id_doc_number_hash)`
 
 **`consent_texts`** — ข้อความขอความยินยอมแต่ละเวอร์ชัน (ต้องรู้ว่าคนกดยอมรับข้อความไหน)
 
@@ -309,7 +321,7 @@ View **`attendee_current_consents`**: แถวล่าสุดของแต
 | device_id | uuid | |
 | staff_user_id | uuid | |
 | direction | enum | `in` \| `out` |
-| result | enum | `accepted` \| `already_in` \| `wrong_ticket_type` \| `cancelled` \| `unknown` |
+| result | enum | `accepted` \| `already_in` \| `wrong_ticket_type` \| `wrong_slot` \| `entry_check_failed` \| `cancelled` \| `unknown` |
 | raw_code | text | ข้อมูลที่สแกนได้ (กรณี unknown) |
 | scanned_at | timestamptz | เวลาบนเครื่อง |
 | received_at | timestamptz | เวลาที่ server ได้รับ |
@@ -453,10 +465,13 @@ View **`sponsor_visible_leads`** — สิ่งที่ sponsor portal แล
 | Endpoint | หน้าที่ |
 |---|---|
 | `POST /api/devices/pair` | ผูกเครื่องกับงาน/บูธ → ได้ `device_id` + token |
-| `GET /api/sync/snapshot?since=<version>` | โหลดรายชื่อ attendee (เฉพาะ field ที่จำเป็น: id, ชื่อ, บริษัท, ประเภทบัตร, สถานะ, qr_version) แบบ delta |
+| `GET /api/sync/snapshot?since=<version>` | โหลดรายชื่อ attendee (เฉพาะ field ที่จำเป็น: id, ชื่อ, บริษัท, ประเภทบัตร, รอบ, สถานะ, qr_version) แบบ delta — งานที่มีหลายรอบโหลดเฉพาะบัตรของวันนี้ |
 | `POST /api/sync/checkins` | ส่งคิวการสแกนเป็น batch (สูงสุด 500 รายการ) → ตอบกลับ id ที่บันทึกแล้ว |
 | `POST /api/sync/booth-scans` | เหมือนกัน สำหรับเครื่องบูธ (รวม rating/notes) |
 | `POST /api/walk-in` | ลงทะเบียนหน้างาน (ถ้า offline จะเข้าคิวรอส่ง, ใช้ id ที่เครื่องสร้าง) |
+| `POST /api/sync/redemptions` | บันทึกการรับ add-on หน้างาน |
+
+API ซื้อบัตร (order, payment, webhook) ดู [TICKETING.md §9](./TICKETING.md#9-api-ที่เพิ่ม)
 
 ---
 
@@ -466,10 +481,11 @@ View **`sponsor_visible_leads`** — สิ่งที่ sponsor portal แล
 |---|---|
 | 2 — Gamification | `quests` (เงื่อนไข เช่น สแกนครบ N บูธ), `quest_completions`, `prize_draws` — นับจาก `booth_scans` ได้เลย |
 | 2 — Session / agenda | `sessions`, `session_registrations`; เช็คอินรายห้องใช้ `checkpoints.kind = session` ที่มีอยู่แล้ว |
-| 2 — ขายบัตร | `orders`, `order_items`, `payments` (PromptPay / gateway), `refunds` |
+| ~~2 — ขายบัตร~~ | ย้ายมา Phase 1 แล้ว — `orders`, `order_items`, `payments`, `refunds`, `time_slots`, `promo_codes`, `products`, `invoices`, `payouts` ([TICKETING.md §8](./TICKETING.md#8-data-model-ที่เพิ่ม--เปลี่ยน)) |
+| 2 — ต่อยอดขายบัตร | `ticket_transfers` (โอน/เปลี่ยนชื่อ), `slot_changes` (เลื่อนรอบ), `seat_maps` + `seats` (ถ้าต้องเลือกที่นั่ง) |
 | 2 — Survey / NPS | `surveys`, `survey_responses` |
 | 2 — AI lead | เพิ่ม column `ai_summary`, `ai_segment` ใน `leads` |
 | 3 — Budget | `budgets`, `budget_lines`, `expenses`, `suppliers`, `sponsor_contracts`, `revenues` |
-| 3 — สินเชื่อ | `loan_applications`, `loans`, `repayments`, `credit_profiles` (คำนวณจากประวัติ event ของ `organizations`) |
+| 3 — สินเชื่อ | `loan_applications`, `loans`, `repayments`, `credit_profiles` (คำนวณจากประวัติ event ของ `organizations`) — หักชำระคืนจาก `payouts.loan_deduction_satang` |
 
 ทุกตารางข้างบนผูกกับ `organizations` / `events` ที่มีอยู่แล้ว จึงไม่ต้องแก้โครงสร้าง MVP
