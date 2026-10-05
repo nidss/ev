@@ -1,0 +1,15 @@
+{
+  "name": "ev",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm --filter @ev/web dev",
+    "build": "pnpm --filter @ev/web build",
+    "start": "pnpm --filter @ev/web start",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp", "esbuild", "@tailwindcss/oxide", "unrs-resolver"]
+  }
+}
