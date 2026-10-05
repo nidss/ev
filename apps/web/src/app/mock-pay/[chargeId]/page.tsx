@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
+import { Steps } from "@/components/steps";
 import { baht } from "@/lib/format";
 import { dict } from "@/lib/i18n";
 import { app, getLocale } from "@/lib/server";
@@ -19,7 +20,10 @@ export default async function MockPayPage(props: { params: Promise<{ chargeId: s
       : null;
 
   return (
-    <main className="mx-auto max-w-md px-4 py-10">
+    <main className="mx-auto max-w-md px-4 py-6">
+      <div className="mb-4">
+        <Steps locale={locale} current={5} />
+      </div>
       <p className="rounded-xl bg-amber-100 p-3 text-center text-xs font-semibold text-amber-900">{t.mockBanner}</p>
       <div className="card mt-4 p-6">
         <p className="text-xs text-muted">{t.mockPayTo}</p>

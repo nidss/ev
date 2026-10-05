@@ -23,3 +23,24 @@ export function dateRange(startIso: string, endIso: string, locale: Locale): str
   const end = new Date(endIso);
   return `${d.formatRange(start, end)} · ${t.format(start)}–${t.format(end)}`;
 }
+
+export function dayLabel(dateOrIso: string, locale: Locale): string {
+  // รับทั้ง YYYY-MM-DD และ ISO เต็ม — YYYY-MM-DD ตีความเป็นเที่ยงวันเวลาไทย กันวันเลื่อน
+  const d = new Date(dateOrIso.length === 10 ? `${dateOrIso}T12:00:00+07:00` : dateOrIso);
+  return new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: TZ,
+  }).format(d);
+}
+
+export function timeRange(startIso: string, endIso: string, locale: Locale): string {
+  const t = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TZ,
+  });
+  return `${t.format(new Date(startIso))}–${t.format(new Date(endIso))}`;
+}

@@ -54,9 +54,26 @@ export interface TicketAvailability {
   slots: { slot: TimeSlot; remaining: number | null }[];
 }
 
+// รอบ = วันที่เข้างาน (แบบ "เลือกรอบการแสดง" ของ ThaiTicketMajor / "เลือกวันที่" ของ Zipevent)
+export interface RoundOffer {
+  ticketTypeId: string;
+  slotId: string | null; // null = บัตรที่ใช้ได้ทั้งงาน (แสดงในทุกรอบ)
+  remaining: number | null;
+  saleState: SaleState;
+}
+
+export interface EventRound {
+  date: string; // YYYY-MM-DD ตามเวลาท้องถิ่นของงาน
+  startsAt: string;
+  endsAt: string;
+  status: "on_sale" | "sold_out" | "closed";
+  offers: RoundOffer[];
+}
+
 export interface EventView {
   catalog: Catalog;
   tickets: TicketAvailability[];
+  rounds: EventRound[];
   products: { product: Product; remaining: number | null }[];
   unlock: { code: string; valid: boolean } | null;
 }
@@ -127,11 +144,57 @@ export class TicketingService {
     return {
       catalog: this.catalog,
       tickets,
+      rounds: this.rounds(tickets),
       products,
       unlock: opts.unlockCode
         ? { code: opts.unlockCode, valid: unlocked.size > 0 && this.isPromoActive(unlockPromo!) }
         : null,
     };
+  }
+
+  private rounds(tickets: TicketAvailability[]): EventRound[] {
+    const { event } = this.catalog;
+    const day = (iso: string) => localDate(iso, event.timezone);
+    const dates: string[] = [];
+    for (let d = Date.parse(event.startsAt); day(new Date(d).toISOString()) <= day(event.endsAt); d += 86_400_000) {
+      const key = day(new Date(d).toISOString());
+      if (!dates.includes(key)) dates.push(key);
+    }
+
+    return dates.map((date) => {
+      const offers: RoundOffer[] = [];
+      for (const t of tickets) {
+        if (t.slots.length === 0) {
+          offers.push({ ticketTypeId: t.ticketType.id, slotId: null, remaining: t.remaining, saleState: t.saleState });
+          continue;
+        }
+        for (const s of t.slots) {
+          if (day(s.slot.startsAt) !== date) continue;
+          const timeClosed = t.saleState === "not_started" || t.saleState === "ended";
+          offers.push({
+            ticketTypeId: t.ticketType.id,
+            slotId: s.slot.id,
+            remaining: s.remaining,
+            saleState: timeClosed ? t.saleState : s.remaining === 0 ? "sold_out" : "on_sale",
+          });
+        }
+      }
+      const daySlots = this.catalog.slots.filter((s) => day(s.startsAt) === date);
+      // สถานะของรอบดูจากบัตรเข้างาน (workshop ซื้อเดี่ยวไม่ได้ จึงไม่นับ)
+      const admission = offers.filter((o) => this.ticketType(o.ticketTypeId).requiresTicketTypeIds === null);
+      const status = admission.some((o) => o.saleState === "on_sale")
+        ? "on_sale"
+        : admission.some((o) => o.saleState === "sold_out")
+          ? "sold_out"
+          : "closed";
+      return {
+        date,
+        startsAt: daySlots.map((s) => s.startsAt).sort()[0] ?? event.startsAt,
+        endsAt: daySlots.map((s) => s.endsAt).sort().at(-1) ?? event.endsAt,
+        status,
+        offers,
+      };
+    });
   }
 
   private availability(t: TicketType): TicketAvailability {
@@ -258,6 +321,7 @@ export class TicketingService {
       status: "pending_payment",
       expiresAt: new Date(now.getTime() + this.catalog.event.holdMinutes * 60_000).toISOString(),
       createdAt: now.toISOString(),
+      termsAcceptedAt: now.toISOString(),
       items,
       unlockCode: unlockPromo && unlocked.size > 0 ? unlockPromo.code : null,
       buyer: null,
@@ -745,6 +809,13 @@ function parseOrThrow<T>(schema: z.ZodType<T, any>, value: unknown): T {
   const r = schema.safeParse(value);
   if (!r.success) throw new TicketingError("invalid_input", "invalid input", { issues: r.error.issues });
   return r.data;
+}
+
+// วันที่ YYYY-MM-DD ตาม timezone ของงาน
+function localDate(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date(iso),
+  );
 }
 
 function inc(map: Map<string, number>, key: string, by: number) {

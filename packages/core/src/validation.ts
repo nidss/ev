@@ -21,6 +21,8 @@ export const orderLineSchema = z.discriminatedUnion("kind", [
 export const createOrderSchema = z.object({
   lines: z.array(orderLineSchema).min(1).max(30),
   unlockCode: z.string().trim().max(40).nullish(),
+  // ผู้ซื้อต้องกดยอมรับเงื่อนไขก่อนเลือกบัตร (ขั้นที่ 1 ของ flow) — บันทึกเวลาไว้ใน order
+  acceptTerms: z.literal(true),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
@@ -46,7 +48,6 @@ export const checkoutSchema = z.object({
   holders: z.array(holderSchema).max(100),
   promoCode: z.string().trim().max(40).nullish(),
   consents: z.object({
-    terms: z.literal(true),
     shareWithSponsors: z.boolean(),
     organizerMarketing: z.boolean(),
   }),

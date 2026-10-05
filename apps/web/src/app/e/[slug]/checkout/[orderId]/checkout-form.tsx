@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
 import type { Buyer, Holder, HolderInfo, Locale, PaymentMethod } from "@ev/core";
+import { Steps } from "@/components/steps";
 import { baht } from "@/lib/format";
 import { dict, errorText } from "@/lib/i18n";
 
@@ -47,7 +48,6 @@ export function CheckoutForm(props: {
   unlockCode: string | null;
   holdSecondsLeft: number;
   lastPaymentFailed: boolean;
-  terms: string[];
   initialBuyer: Buyer | null;
   initialHolders: Holder[];
   initialPromo: { code: string; label: string } | null;
@@ -107,7 +107,9 @@ export function CheckoutForm(props: {
 
   const [wantTax, setWantTax] = useState(false);
   const [tax, setTax] = useState({ name: "", taxId: "", branch: "", address: "" });
-  const [consents, setConsents] = useState({ terms: false, shareWithSponsors: false, organizerMarketing: false });
+  const [consents, setConsents] = useState({ shareWithSponsors: false, organizerMarketing: false });
+  // ขั้น 4 กรอกข้อมูล → ขั้น 5 ตรวจสอบและชำระเงิน (อยู่หน้าเดียวกัน ข้อมูลไม่หายเมื่อย้อนกลับ)
+  const [phase, setPhase] = useState<"info" | "review">("info");
   const [method, setMethod] = useState<PaymentMethod>("promptpay");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,238 +185,307 @@ export function CheckoutForm(props: {
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
   const free = totals.totalSatang === 0;
+  const holderName = (key: string) => {
+    const h = holders[key]!;
+    return h.sameAsBuyer ? `${buyer.firstName} ${buyer.lastName}` : `${h.firstName} ${h.lastName}`;
+  };
+
+  function onSubmit(e: React.FormEvent) {
+    if (phase === "info") {
+      e.preventDefault();
+      setPhase("review");
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    void submit(e);
+  }
 
   return (
-    <form onSubmit={submit} className="mt-2 grid gap-6 lg:grid-cols-[1fr_380px]">
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">{t.checkout}</h1>
-          <span
-            className={`rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${secondsLeft < 120 ? "bg-red-100 text-red-700" : "bg-brand/10 text-brand"}`}
-          >
-            ⏱ {t.timeLeft} {mm}:{ss}
-          </span>
-        </div>
-        {props.lastPaymentFailed && (
-          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{t.paymentFailed}</p>
-        )}
-
-        <section className="card p-5">
-          <h2 className="font-semibold">{t.buyer}</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Field label={t.firstName} value={buyer.firstName} onChange={(v) => setBuyer({ ...buyer, firstName: v })} required />
-            <Field label={t.lastName} value={buyer.lastName} onChange={(v) => setBuyer({ ...buyer, lastName: v })} required />
-            <Field label={t.email} type="email" value={buyer.email} onChange={(v) => setBuyer({ ...buyer, email: v })} required />
-            <Field label={t.phone} type="tel" value={buyer.phone} onChange={(v) => setBuyer({ ...buyer, phone: v })} />
-            <div>
-              <label className="label" htmlFor="nationality">
-                {t.nationality}
-              </label>
-              <select
-                id="nationality"
-                className="field"
-                value={buyer.nationality}
-                onChange={(e) => setBuyer({ ...buyer, nationality: e.target.value })}
-              >
-                {COUNTRIES.map((c) => (
-                  <option key={c} value={c}>
-                    {regionName.of(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
+    <form onSubmit={onSubmit} className="mt-2 space-y-6">
+      <Steps locale={locale} current={phase === "info" ? 4 : 5} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold">{phase === "info" ? t.checkout : t.reviewTitle}</h1>
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${secondsLeft < 120 ? "bg-red-100 text-red-700" : "bg-brand/10 text-brand"}`}
+            >
+              ⏱ {t.timeLeft} {mm}:{ss}
+            </span>
           </div>
-        </section>
+          {props.lastPaymentFailed && (
+            <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{t.paymentFailed}</p>
+          )}
 
-        {slots.length > 0 && (
-          <section className="card p-5">
-            <h2 className="font-semibold">{t.holders}</h2>
-            <p className="mt-1 text-xs text-muted">{t.holdersNote}</p>
-            <div className="mt-4 space-y-4">
-              {slots.map(({ item, index, key }) => {
-                const h = holders[key]!;
-                const full = item.holderInfo === "full";
-                return (
-                  <div key={key} className="rounded-xl border border-line p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-sm font-medium">
-                        {item.name}
-                        {item.slotLabel && <span className="text-muted"> · {item.slotLabel}</span>}
-                        <span className="text-muted"> · {t.ticketN(index + 1)}</span>
-                      </div>
-                      <label className="flex items-center gap-2 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={h.sameAsBuyer}
-                          onChange={(e) => setHolder(key, { sameAsBuyer: e.target.checked })}
-                        />
-                        {t.sameAsBuyer}
-                      </label>
-                    </div>
-                    {!h.sameAsBuyer && (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <Field label={t.firstName} value={h.firstName} onChange={(v) => setHolder(key, { firstName: v })} required />
-                        <Field label={t.lastName} value={h.lastName} onChange={(v) => setHolder(key, { lastName: v })} required />
-                        {full && (
-                          <Field label={t.email} type="email" value={h.email} onChange={(v) => setHolder(key, { email: v })} required />
-                        )}
-                      </div>
-                    )}
-                    {full && (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <Field label={t.company} value={h.company} onChange={(v) => setHolder(key, { company: v })} />
-                        <Field label={t.jobTitle} value={h.jobTitle} onChange={(v) => setHolder(key, { jobTitle: v })} />
-                      </div>
-                    )}
+          {phase === "info" ? (
+            <>
+              <section className="card p-5">
+                <h2 className="font-semibold">{t.buyer}</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Field label={t.firstName} value={buyer.firstName} onChange={(v) => setBuyer({ ...buyer, firstName: v })} required />
+                  <Field label={t.lastName} value={buyer.lastName} onChange={(v) => setBuyer({ ...buyer, lastName: v })} required />
+                  <Field label={t.email} type="email" value={buyer.email} onChange={(v) => setBuyer({ ...buyer, email: v })} required />
+                  <Field label={t.phone} type="tel" value={buyer.phone} onChange={(v) => setBuyer({ ...buyer, phone: v })} />
+                  <div>
+                    <label className="label" htmlFor="nationality">
+                      {t.nationality}
+                    </label>
+                    <select
+                      id="nationality"
+                      className="field"
+                      value={buyer.nationality}
+                      onChange={(e) => setBuyer({ ...buyer, nationality: e.target.value })}
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>
+                          {regionName.of(c)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                </div>
+              </section>
 
-        <section className="card p-5">
-          <h2 className="font-semibold">{t.consents}</h2>
-          <div className="mt-3 space-y-3 text-sm">
-            <label className="flex gap-2">
-              <input
-                type="checkbox"
-                required
-                checked={consents.terms}
-                onChange={(e) => setConsents({ ...consents, terms: e.target.checked })}
-              />
-              <span>{t.consentTerms}</span>
-            </label>
-            <ul className="ml-6 list-disc space-y-1 text-xs text-muted">
-              {props.terms.map((x) => (
-                <li key={x}>{x}</li>
-              ))}
-            </ul>
-            <label className="flex gap-2">
-              <input
-                type="checkbox"
-                checked={consents.shareWithSponsors}
-                onChange={(e) => setConsents({ ...consents, shareWithSponsors: e.target.checked })}
-              />
-              <span>{t.consentSponsors}</span>
-            </label>
-            <label className="flex gap-2">
-              <input
-                type="checkbox"
-                checked={consents.organizerMarketing}
-                onChange={(e) => setConsents({ ...consents, organizerMarketing: e.target.checked })}
-              />
-              <span>{t.consentMarketing}</span>
-            </label>
-          </div>
-        </section>
+              {slots.length > 0 && (
+                <section className="card p-5">
+                  <h2 className="font-semibold">{t.holders}</h2>
+                  <p className="mt-1 text-xs text-muted">{t.holdersNote}</p>
+                  <div className="mt-4 space-y-4">
+                    {slots.map(({ item, index, key }) => {
+                      const h = holders[key]!;
+                      const full = item.holderInfo === "full";
+                      return (
+                        <div key={key} className="rounded-xl border border-line p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-medium">
+                              {item.name}
+                              {item.slotLabel && <span className="text-muted"> · {item.slotLabel}</span>}
+                              <span className="text-muted"> · {t.ticketN(index + 1)}</span>
+                            </div>
+                            <label className="flex items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={h.sameAsBuyer}
+                                onChange={(e) => setHolder(key, { sameAsBuyer: e.target.checked })}
+                              />
+                              {t.sameAsBuyer}
+                            </label>
+                          </div>
+                          {!h.sameAsBuyer && (
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <Field label={t.firstName} value={h.firstName} onChange={(v) => setHolder(key, { firstName: v })} required />
+                              <Field label={t.lastName} value={h.lastName} onChange={(v) => setHolder(key, { lastName: v })} required />
+                              {full && (
+                                <Field label={t.email} type="email" value={h.email} onChange={(v) => setHolder(key, { email: v })} required />
+                              )}
+                            </div>
+                          )}
+                          {full && (
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <Field label={t.company} value={h.company} onChange={(v) => setHolder(key, { company: v })} />
+                              <Field label={t.jobTitle} value={h.jobTitle} onChange={(v) => setHolder(key, { jobTitle: v })} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
-        {!free && (
-          <section className="card p-5">
-            <h2 className="font-semibold">{t.paymentMethod}</h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {(
-                [
-                  ["promptpay", t.pmPromptpay, "▦"],
-                  ["card", t.pmCard, "💳"],
-                  ["mobile_banking", t.pmMobileBanking, "📱"],
-                ] as const
-              ).map(([value, label, icon]) => (
-                <label
-                  key={value}
-                  className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm ${method === value ? "border-brand bg-brand/5" : "border-line"}`}
-                >
-                  <input type="radio" name="method" checked={method === value} onChange={() => setMethod(value)} />
-                  <span aria-hidden>{icon}</span>
-                  {label}
-                </label>
-              ))}
-            </div>
-            <label className="mt-4 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={wantTax} onChange={(e) => setWantTax(e.target.checked)} />
-              {t.taxInvoice}
-            </label>
-            {wantTax && (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Field label={t.taxName} value={tax.name} onChange={(v) => setTax({ ...tax, name: v })} required />
-                <Field
-                  label={t.taxId}
-                  value={tax.taxId}
-                  onChange={(v) => setTax({ ...tax, taxId: v.replace(/\D/g, "").slice(0, 13) })}
-                  required
-                  pattern="\d{13}"
-                />
-                <Field label={t.taxBranch} value={tax.branch} onChange={(v) => setTax({ ...tax, branch: v })} required />
-                <Field label={t.taxAddress} value={tax.address} onChange={(v) => setTax({ ...tax, address: v })} required />
-              </div>
-            )}
-          </section>
-        )}
-      </div>
+              <section className="card p-5">
+                <h2 className="font-semibold">{t.consents}</h2>
+                <div className="mt-3 space-y-3 text-sm">
+                  <label className="flex gap-2">
+                    <input
+                      type="checkbox"
+                      checked={consents.shareWithSponsors}
+                      onChange={(e) => setConsents({ ...consents, shareWithSponsors: e.target.checked })}
+                    />
+                    <span>{t.consentSponsors}</span>
+                  </label>
+                  <label className="flex gap-2">
+                    <input
+                      type="checkbox"
+                      checked={consents.organizerMarketing}
+                      onChange={(e) => setConsents({ ...consents, organizerMarketing: e.target.checked })}
+                    />
+                    <span>{t.consentMarketing}</span>
+                  </label>
+                </div>
+              </section>
 
-      <aside className="card h-fit p-5 lg:sticky lg:top-4">
-        <h2 className="font-semibold">{t.summary}</h2>
-        <p className="text-xs text-muted">
-          {t.orderCode} {props.orderCode}
-        </p>
-        <ul className="mt-3 space-y-2 text-sm">
-          {items.map((i) => (
-            <li key={i.id} className="flex justify-between gap-3">
-              <span className="min-w-0">
-                {i.quantity} × {i.name}
-                {i.slotLabel && <span className="block text-xs text-muted">{i.slotLabel}</span>}
-              </span>
-              <span className="whitespace-nowrap">
-                {i.unitPriceSatang === 0 ? t.free : baht(i.unitPriceSatang * i.quantity, locale)}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-4 border-t border-line pt-4">
-          <label className="label" htmlFor="promo">
-            {t.promo}
-          </label>
-          {promo ? (
-            <div className="flex items-center justify-between rounded-lg bg-brand/10 px-3 py-2 text-sm text-brand">
-              <span>{t.promoApplied(`${promo.code} · ${promo.label}`)}</span>
-              <button type="button" className="text-xs underline" onClick={() => applyPromo(null)}>
-                {t.remove}
-              </button>
-            </div>
+              {!free && (
+                <section className="card p-5">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={wantTax} onChange={(e) => setWantTax(e.target.checked)} />
+                    {t.taxInvoice}
+                  </label>
+                  {wantTax && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <Field label={t.taxName} value={tax.name} onChange={(v) => setTax({ ...tax, name: v })} required />
+                      <Field
+                        label={t.taxId}
+                        value={tax.taxId}
+                        onChange={(v) => setTax({ ...tax, taxId: v.replace(/\D/g, "").slice(0, 13) })}
+                        required
+                        pattern="\d{13}"
+                      />
+                      <Field label={t.taxBranch} value={tax.branch} onChange={(v) => setTax({ ...tax, branch: v })} required />
+                      <Field label={t.taxAddress} value={tax.address} onChange={(v) => setTax({ ...tax, address: v })} required />
+                    </div>
+                  )}
+                </section>
+              )}
+            </>
           ) : (
-            <div className="flex gap-2">
-              <input id="promo" className="field" value={promoInput} onChange={(e) => setPromoInput(e.target.value)} />
-              <button
-                type="button"
-                className="rounded-lg border border-line px-3 text-sm hover:border-brand disabled:opacity-40"
-                disabled={!promoInput.trim()}
-                onClick={() => applyPromo(promoInput.trim())}
-              >
-                {t.applyCode}
-              </button>
+            <>
+              <section className="card p-5 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold">{t.buyer}</h2>
+                  <button type="button" className="text-brand underline" onClick={() => setPhase("info")}>
+                    {t.editInfo}
+                  </button>
+                </div>
+                <p className="mt-2">
+                  {buyer.firstName} {buyer.lastName} · {buyer.email}
+                  {buyer.phone && ` · ${buyer.phone}`} · {regionName.of(buyer.nationality)}
+                </p>
+                {slots.length > 0 && (
+                  <>
+                    <h3 className="mt-4 font-semibold">{t.holders}</h3>
+                    <ul className="mt-1 space-y-1 text-muted">
+                      {slots.map(({ item, index, key }) => (
+                        <li key={key}>
+                          {item.name} · {t.ticketN(index + 1)} — <span className="text-ink">{holderName(key)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {wantTax && (
+                  <p className="mt-4 text-muted">
+                    {t.taxInvoice}: {tax.name} ({tax.taxId})
+                  </p>
+                )}
+              </section>
+
+              {!free && (
+                <section className="card p-5">
+                  <h2 className="font-semibold">{t.paymentMethod}</h2>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {(
+                      [
+                        ["promptpay", t.pmPromptpay, "▦"],
+                        ["card", t.pmCard, "💳"],
+                        ["mobile_banking", t.pmMobileBanking, "📱"],
+                      ] as const
+                    ).map(([value, label, icon]) => (
+                      <label
+                        key={value}
+                        className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm ${method === value ? "border-brand bg-brand/5" : "border-line"}`}
+                      >
+                        <input type="radio" name="method" checked={method === value} onChange={() => setMethod(value)} />
+                        <span aria-hidden>{icon}</span>
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+
+        <aside className="card h-fit p-5 lg:sticky lg:top-4">
+          <h2 className="font-semibold">{t.summary}</h2>
+          <p className="text-xs text-muted">
+            {t.orderCode} {props.orderCode}
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {items.map((i) => (
+              <li key={i.id} className="flex justify-between gap-3">
+                <span className="min-w-0">
+                  {i.quantity} × {i.name}
+                  {i.slotLabel && <span className="block text-xs text-muted">{i.slotLabel}</span>}
+                </span>
+                <span className="whitespace-nowrap">
+                  {i.unitPriceSatang === 0 ? t.free : baht(i.unitPriceSatang * i.quantity, locale)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {phase === "review" && (
+            <div className="mt-4 border-t border-line pt-4">
+              <label className="label" htmlFor="promo">
+                {t.promo}
+              </label>
+              {promo ? (
+                <div className="flex items-center justify-between rounded-lg bg-brand/10 px-3 py-2 text-sm text-brand">
+                  <span>{t.promoApplied(`${promo.code} · ${promo.label}`)}</span>
+                  <button type="button" className="text-xs underline" onClick={() => applyPromo(null)}>
+                    {t.remove}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    id="promo"
+                    className="field"
+                    value={promoInput}
+                    onChange={(e) => setPromoInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter ในช่องโค้ดต้องใช้โค้ด ไม่ใช่ submit ฟอร์ม (ซึ่งจะพาไปจ่ายเงิน)
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (promoInput.trim()) void applyPromo(promoInput.trim());
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="rounded-lg border border-line px-3 text-sm hover:border-brand disabled:opacity-40"
+                    disabled={!promoInput.trim()}
+                    onClick={() => applyPromo(promoInput.trim())}
+                  >
+                    {t.applyCode}
+                  </button>
+                </div>
+              )}
+              {promoError && <p className="mt-1 text-xs text-red-600">{promoError}</p>}
+              {props.unlockCode && <p className="mt-2 text-xs text-muted">🔓 {t.codeUnlocked(props.unlockCode)}</p>}
             </div>
           )}
-          {promoError && <p className="mt-1 text-xs text-red-600">{promoError}</p>}
-          {props.unlockCode && <p className="mt-2 text-xs text-muted">🔓 {t.codeUnlocked(props.unlockCode)}</p>}
-        </div>
 
-        <dl className="mt-4 space-y-1 border-t border-line pt-4 text-sm">
-          <Row label={t.subtotal} value={baht(totals.subtotalSatang, locale)} />
-          {totals.discountSatang > 0 && <Row label={t.discount} value={`−${baht(totals.discountSatang, locale)}`} />}
-          {totals.feeSatang > 0 && <Row label={t.fee} value={baht(totals.feeSatang, locale)} />}
-          <div className="flex justify-between pt-2 text-lg font-bold">
-            <dt>{t.total}</dt>
-            <dd>{baht(totals.totalSatang, locale)}</dd>
-          </div>
-          {totals.vatSatang > 0 && <p className="text-xs text-muted">{t.vatIncluded(baht(totals.vatSatang, locale))}</p>}
-        </dl>
+          <dl className="mt-4 space-y-1 border-t border-line pt-4 text-sm">
+            <Row label={t.subtotal} value={baht(totals.subtotalSatang, locale)} />
+            {totals.discountSatang > 0 && <Row label={t.discount} value={`−${baht(totals.discountSatang, locale)}`} />}
+            {totals.feeSatang > 0 && <Row label={t.fee} value={baht(totals.feeSatang, locale)} />}
+            <div className="flex justify-between pt-2 text-lg font-bold">
+              <dt>{t.total}</dt>
+              <dd>{baht(totals.totalSatang, locale)}</dd>
+            </div>
+            {totals.vatSatang > 0 && <p className="text-xs text-muted">{t.vatIncluded(baht(totals.vatSatang, locale))}</p>}
+          </dl>
 
-        {error && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
-        <button className="btn-primary mt-4 w-full" disabled={busy}>
-          {busy ? t.processing : free ? t.confirmFree : t.payNow(baht(totals.totalSatang, locale))}
-        </button>
-      </aside>
+          {error && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+          <button className="btn-primary mt-4 w-full" disabled={busy}>
+            {phase === "info"
+              ? t.toPayment
+              : busy
+                ? t.processing
+                : free
+                  ? t.confirmFree
+                  : t.payNow(baht(totals.totalSatang, locale))}
+          </button>
+          {phase === "review" && (
+            <button type="button" className="mt-2 w-full py-2 text-sm text-muted underline" onClick={() => setPhase("info")}>
+              {t.back}
+            </button>
+          )}
+        </aside>
+      </div>
     </form>
   );
 }

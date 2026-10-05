@@ -37,7 +37,7 @@ const buyer = {
   phone: null,
   nationality: "TH",
 };
-const consents = { terms: true as const, shareWithSponsors: true, organizerMarketing: false };
+const consents = { shareWithSponsors: true, organizerMarketing: false };
 
 function holdersFor(order: { items: { id: string; kind: string; quantity: number }[] }, emailPrefix = "h") {
   return order.items
@@ -133,10 +133,56 @@ describe("event view", () => {
   });
 });
 
+describe("rounds", () => {
+  it("groups offers by event day: day tickets and workshops per day, 2-day passes in every round", () => {
+    const { svc } = setup();
+    const rounds = svc.getEventView(SLUG).rounds;
+    expect(rounds.map((r) => r.date)).toEqual(["2026-11-21", "2026-11-22"]);
+    const sat = rounds[0]!;
+    const offers = sat.offers.map((o) => `${o.ticketTypeId}|${o.slotId ?? ""}`);
+    expect(offers).toContain("tt_expo|slot_day1");
+    expect(offers).not.toContain("tt_expo|slot_day2");
+    expect(offers).toContain("tt_conf|");
+    expect(offers).toContain("tt_ws_ai|slot_ws_ai");
+    expect(offers).not.toContain("tt_ws_fin|slot_ws_fin");
+    expect(sat.status).toBe("on_sale");
+    expect(sat.startsAt).toBe("2026-11-21T09:00:00+07:00");
+  });
+
+  it("marks a sold-out workshop per round without closing the round", () => {
+    const { svc } = setup();
+    for (let i = 0; i < 2; i++) {
+      svc.createOrder(SLUG, {
+        acceptTerms: true,
+        lines: [
+          { kind: "ticket", ticketTypeId: "tt_conf", quantity: 4 },
+          { kind: "ticket", ticketTypeId: "tt_ws_content", quantity: 4 },
+        ],
+      });
+    }
+    const sun = svc.getEventView(SLUG).rounds[1]!;
+    expect(sun.offers.find((o) => o.ticketTypeId === "tt_ws_content")!.saleState).toBe("sold_out");
+    expect(sun.status).toBe("on_sale");
+  });
+});
+
 describe("create order", () => {
+  it("requires accepting the terms first and records when", () => {
+    const { svc } = setup();
+    expectCode(
+      () => svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] }),
+      "invalid_input",
+    );
+    const { order } = svc.createOrder(SLUG, {
+      acceptTerms: true,
+      lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }],
+    });
+    expect(order.termsAcceptedAt).toBe(new Date("2026-10-05T10:00:00+07:00").toISOString());
+  });
+
   it("reserves capacity and releases it when the hold expires", () => {
     const { svc, advance } = setup();
-    svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_vip", quantity: 3 }] });
+    svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_vip", quantity: 3 }] });
     expect(svc.store.ticketTypeTaken.get("tt_vip")).toBe(3);
     expect(svc.store.eventTaken).toBe(3);
     advance(16);
@@ -150,6 +196,7 @@ describe("create order", () => {
     // WS-CONTENT มี 8 ที่ — 2 order ละ 4 ใบเต็มพอดี
     for (let i = 0; i < 2; i++) {
       svc.createOrder(SLUG, {
+        acceptTerms: true,
         lines: [
           { kind: "ticket", ticketTypeId: "tt_conf", quantity: 4 },
           { kind: "ticket", ticketTypeId: "tt_ws_content", quantity: 4 },
@@ -160,6 +207,7 @@ describe("create order", () => {
     expectCode(
       () =>
         svc.createOrder(SLUG, {
+          acceptTerms: true,
           lines: [
             { kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 },
             { kind: "ticket", ticketTypeId: "tt_ws_content", quantity: 1 },
@@ -177,12 +225,13 @@ describe("create order", () => {
   it("requires an admission ticket in the same order for workshops and add-ons", () => {
     const { svc } = setup();
     expectCode(
-      () => svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_ws_ai", quantity: 1 }] }),
+      () => svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_ws_ai", quantity: 1 }] }),
       "requires_admission",
     );
     expectCode(
       () =>
         svc.createOrder(SLUG, {
+          acceptTerms: true,
           lines: [
             { kind: "ticket", ticketTypeId: "tt_ws_ai", quantity: 1 },
             { kind: "addon", productId: "pr_lunch", quantity: 1 },
@@ -195,12 +244,13 @@ describe("create order", () => {
   it("requires choosing a day for the expo pass and enforces per-order limits", () => {
     const { svc } = setup();
     expectCode(
-      () => svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_expo", quantity: 1 }] }),
+      () => svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_expo", quantity: 1 }] }),
       "invalid_input",
     );
     expectCode(
       () =>
         svc.createOrder(SLUG, {
+          acceptTerms: true,
           lines: [
             { kind: "ticket", ticketTypeId: "tt_expo", slotId: "slot_day1", quantity: 3 },
             { kind: "ticket", ticketTypeId: "tt_expo", slotId: "slot_day2", quantity: 3 },
@@ -213,12 +263,12 @@ describe("create order", () => {
   it("rejects hidden tickets without the unlock code and stops sales after the sales window", () => {
     const { svc } = setup();
     expectCode(
-      () => svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_press", quantity: 1 }] }),
+      () => svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_press", quantity: 1 }] }),
       "not_found",
     );
     const late = setup({ start: "2026-11-21T12:00:00+07:00" });
     expectCode(
-      () => late.svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] }),
+      () => late.svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] }),
       "not_on_sale",
     );
   });
@@ -228,6 +278,7 @@ describe("checkout", () => {
   it("confirms a free order immediately and issues signed QR tickets", async () => {
     const { svc } = setup();
     const { order, accessToken } = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [{ kind: "ticket", ticketTypeId: "tt_expo", slotId: "slot_day1", quantity: 2 }],
     });
     const holders = holdersFor(order);
@@ -245,6 +296,7 @@ describe("checkout", () => {
   it("rejects the same person registering twice for a one-per-person free ticket", async () => {
     const { svc } = setup();
     const first = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [{ kind: "ticket", ticketTypeId: "tt_expo", slotId: "slot_day1", quantity: 1 }],
     });
     const h = holdersFor(first.order);
@@ -252,6 +304,7 @@ describe("checkout", () => {
     await svc.submitCheckout(first.order.id, first.accessToken, { buyer, holders: h, consents });
 
     const second = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [{ kind: "ticket", ticketTypeId: "tt_expo", slotId: "slot_day1", quantity: 1 }],
     });
     const h2 = holdersFor(second.order);
@@ -265,6 +318,7 @@ describe("checkout", () => {
   it("runs a paid order through the mock gateway and webhook", async () => {
     const { svc, payments } = setup();
     const { order, accessToken } = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [
         { kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 },
         { kind: "ticket", ticketTypeId: "tt_ws_fin", quantity: 1 },
@@ -300,6 +354,7 @@ describe("checkout", () => {
   it("rejects webhooks with a bad signature", async () => {
     const { svc, payments } = setup();
     const { order, accessToken } = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [{ kind: "ticket", ticketTypeId: "tt_vip", quantity: 1 }],
     });
     await svc.submitCheckout(order.id, accessToken, {
@@ -317,6 +372,7 @@ describe("checkout", () => {
   it("lets the buyer retry after a failed payment", async () => {
     const { svc, payments } = setup();
     const { order, accessToken } = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }],
     });
     const input = { buyer, holders: holdersFor(order), consents, paymentMethod: "card" as const };
@@ -337,7 +393,7 @@ describe("checkout", () => {
       { kind: "ticket" as const, ticketTypeId: "tt_conf", quantity: 4 },
       { kind: "ticket" as const, ticketTypeId: "tt_ws_content", quantity: 4 },
     ];
-    const late = svc.createOrder(SLUG, { lines });
+    const late = svc.createOrder(SLUG, { acceptTerms: true, lines });
     await svc.submitCheckout(late.order.id, late.accessToken, {
       buyer,
       holders: holdersFor(late.order),
@@ -349,8 +405,8 @@ describe("checkout", () => {
     advance(20); // หมดเวลาจอง ที่นั่งถูกปล่อย
     expect(svc.getOrder(late.order.id, late.accessToken).order.status).toBe("expired");
     // มีคนอื่นซื้อ workshop จนเต็ม
-    svc.createOrder(SLUG, { lines });
-    svc.createOrder(SLUG, { lines });
+    svc.createOrder(SLUG, { acceptTerms: true, lines });
+    svc.createOrder(SLUG, { acceptTerms: true, lines });
 
     const hook = payments.simulate(lateCharge, "succeeded");
     expect(await svc.handleWebhook(hook.headers, hook.body)).toEqual({ result: "refunded" });
@@ -359,7 +415,7 @@ describe("checkout", () => {
 
     // กรณียังมีที่ว่าง: จ่ายช้าแต่ได้บัตร
     const s2 = setup();
-    const o = s2.svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_vip", quantity: 1 }] });
+    const o = s2.svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_vip", quantity: 1 }] });
     await s2.svc.submitCheckout(o.order.id, o.accessToken, {
       buyer,
       holders: holdersFor(o.order),
@@ -377,6 +433,7 @@ describe("checkout", () => {
   it("refuses checkout with a wrong token or after expiry", async () => {
     const { svc, advance } = setup();
     const { order, accessToken } = svc.createOrder(SLUG, {
+      acceptTerms: true,
       lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }],
     });
     expectCode(() => svc.getOrder(order.id, "wrong"), "forbidden");
@@ -396,7 +453,7 @@ describe("checkout", () => {
     const catalog = createMockCatalog();
     catalog.promoCodes.find((p) => p.code === "TEAM10")!.maxUses = 1;
     const { svc, advance } = setup({ catalog });
-    const a = svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });
+    const a = svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });
     await svc.submitCheckout(a.order.id, a.accessToken, {
       buyer,
       holders: holdersFor(a.order),
@@ -404,11 +461,11 @@ describe("checkout", () => {
       promoCode: "TEAM10",
       paymentMethod: "card",
     });
-    const b = svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });
+    const b = svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });
     expectCode(() => svc.quote(b.order.id, b.accessToken, { promoCode: "TEAM10" }), "promo_invalid");
     advance(16);
     svc.expireStale();
-    const c = svc.createOrder(SLUG, { lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });
+    const c = svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });
     expect(svc.quote(c.order.id, c.accessToken, { promoCode: "TEAM10" }).discountSatang).toBe(25_000);
   });
 });

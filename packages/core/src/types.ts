@@ -146,7 +146,6 @@ export interface Holder {
 }
 
 export interface Consents {
-  terms: boolean;
   shareWithSponsors: boolean;
   organizerMarketing: boolean;
 }
@@ -166,6 +165,7 @@ export interface Order {
   status: OrderStatus;
   expiresAt: string;
   createdAt: string;
+  termsAcceptedAt: string;
   items: OrderItem[];
   unlockCode: string | null;
   buyer: Buyer | null;

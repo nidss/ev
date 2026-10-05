@@ -1,0 +1,417 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import type { EventRound, Locale, OrderLineInput, SaleState, TicketKind } from "@ev/core";
+import { Steps } from "@/components/steps";
+import { baht } from "@/lib/format";
+import { dict, errorText } from "@/lib/i18n";
+
+export interface WizardTicket {
+  id: string;
+  kind: TicketKind;
+  name: string;
+  description: string;
+  perks: string[];
+  priceSatang: number;
+  compareAtSatang: number | null;
+  maxPerOrder: number;
+  requiresAdmission: boolean;
+  hidden: boolean;
+  wholeEvent: boolean;
+}
+
+export interface WizardRound {
+  date: string;
+  label: string;
+  time: string;
+  status: EventRound["status"];
+  offers: {
+    ticketTypeId: string;
+    slotId: string | null;
+    slotLabel: string | null;
+    remaining: number | null;
+    saleState: SaleState;
+  }[];
+}
+
+export interface WizardProduct {
+  id: string;
+  name: string;
+  description: string;
+  priceSatang: number;
+  remaining: number | null;
+  maxPerOrder: number;
+  requiresAdmission: boolean;
+}
+
+const ALMOST_FULL = 10;
+const offerKey = (o: { ticketTypeId: string; slotId: string | null }) => `${o.ticketTypeId}|${o.slotId ?? ""}`;
+
+// ขั้น 1–3 ของการซื้อบัตร: ยอมรับเงื่อนไข → เลือกรอบ → เลือกบัตร
+// ขั้นปัจจุบันเก็บใน URL (?accepted=1&round=YYYY-MM-DD) เพื่อให้ปุ่ม back ของเบราว์เซอร์และการ reload ใช้ได้
+export function BuyWizard(props: {
+  locale: Locale;
+  slug: string;
+  holdMinutes: number;
+  terms: string[];
+  rounds: WizardRound[];
+  tickets: Record<string, WizardTicket>;
+  products: WizardProduct[];
+  unlock: { code: string; valid: boolean } | null;
+}) {
+  const { locale, rounds, tickets, products } = props;
+  const t = dict(locale);
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const accepted = params.get("accepted") === "1";
+  const round = rounds.find((r) => r.date === params.get("round") && r.status === "on_sale") ?? null;
+  const step: 1 | 2 | 3 = !accepted ? 1 : !round ? 2 : 3;
+
+  const [agree, setAgree] = useState(false);
+  const [qty, setQty] = useState<Record<string, number>>({});
+  const [codeInput, setCodeInput] = useState(props.unlock?.code ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function go(next: Record<string, string | null>) {
+    const sp = new URLSearchParams(params.toString());
+    for (const [k, v] of Object.entries(next)) {
+      if (v === null) sp.delete(k);
+      else sp.set(k, v);
+    }
+    window.history.pushState(null, "", `?${sp.toString()}`);
+    window.scrollTo({ top: 0 });
+  }
+
+  // ---------- ขั้น 3: คำนวณรายการที่เลือก ----------
+  const offers = round?.offers ?? [];
+  const typeTotal = (id: string) =>
+    offers.filter((o) => o.ticketTypeId === id).reduce((a, o) => a + (qty[offerKey(o)] ?? 0), 0);
+
+  const lines = useMemo(() => {
+    const out: { key: string; label: string; quantity: number; unit: number; input: OrderLineInput }[] = [];
+    for (const o of offers) {
+      const n = qty[offerKey(o)] ?? 0;
+      if (n <= 0) continue;
+      const tk = tickets[o.ticketTypeId]!;
+      out.push({
+        key: offerKey(o),
+        label: tk.name,
+        quantity: n,
+        unit: tk.priceSatang,
+        input: { kind: "ticket", ticketTypeId: o.ticketTypeId, slotId: o.slotId, quantity: n },
+      });
+    }
+    for (const p of products) {
+      const n = qty[`addon|${p.id}`] ?? 0;
+      if (n > 0) {
+        out.push({
+          key: `addon|${p.id}`,
+          label: p.name,
+          quantity: n,
+          unit: p.priceSatang,
+          input: { kind: "addon", productId: p.id, quantity: n },
+        });
+      }
+    }
+    return out;
+  }, [qty, offers, tickets, products]);
+
+  const total = lines.reduce((a, l) => a + l.unit * l.quantity, 0);
+  const hasAdmission = lines.some((l) => l.input.kind === "ticket" && !tickets[l.input.ticketTypeId]!.requiresAdmission);
+  const needsAdmission = lines.some((l) =>
+    l.input.kind === "ticket"
+      ? tickets[l.input.ticketTypeId]!.requiresAdmission
+      : products.find((p) => p.id === (l.input as { productId: string }).productId)!.requiresAdmission,
+  );
+  const blocked = needsAdmission && !hasAdmission;
+  const hasTicket = lines.some((l) => l.input.kind === "ticket");
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: props.slug,
+          acceptTerms: true,
+          lines: lines.map((l) => l.input),
+          unlockCode: props.unlock?.valid ? props.unlock.code : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.code);
+      router.push(`/e/${props.slug}/checkout/${data.orderId}?token=${encodeURIComponent(data.token)}`);
+    } catch (e) {
+      setError(errorText(locale, (e as Error).message));
+      setBusy(false);
+      router.refresh(); // ดึงจำนวนที่เหลือล่าสุด
+    }
+  }
+
+  function applyCode(e: React.FormEvent) {
+    e.preventDefault();
+    const sp = new URLSearchParams(params.toString());
+    if (codeInput.trim()) sp.set("code", codeInput.trim());
+    else sp.delete("code");
+    router.replace(`?${sp.toString()}`, { scroll: false }); // โหลดข้อมูลใหม่จาก server ให้บัตรที่ปลดล็อกโผล่
+  }
+
+  const availability = (remaining: number | null, state: SaleState) => {
+    if (state === "not_started") return <span>{t.notStarted}</span>;
+    if (state === "ended") return <span>{t.ended}</span>;
+    if (state === "sold_out" || remaining === 0) return <span className="font-medium text-red-600">{t.soldOut}</span>;
+    if (remaining === null) return null;
+    if (remaining <= ALMOST_FULL) return <span className="font-medium text-amber-600">{t.almostFull(remaining)}</span>;
+    return <span>{t.remaining(remaining)}</span>;
+  };
+
+  function renderOffer(o: WizardRound["offers"][number]) {
+    const tk = tickets[o.ticketTypeId]!;
+    const key = offerKey(o);
+    const n = qty[key] ?? 0;
+    const onSale = o.saleState === "on_sale";
+    const cap = Math.min(tk.maxPerOrder - (typeTotal(tk.id) - n), o.remaining ?? Infinity);
+    return (
+      <div key={key} className={`card p-5 ${onSale ? "" : "opacity-60"}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold">
+              {tk.name}
+              {tk.hidden && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">🔓</span>}
+            </h3>
+            {o.slotLabel && tk.kind === "workshop" && <p className="mt-0.5 text-sm font-medium text-brand">{o.slotLabel}</p>}
+            <p className="mt-1 text-sm text-muted">{tk.description}</p>
+            {tk.perks.length > 0 && (
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {tk.perks.map((p) => (
+                  <li key={p} className="rounded-full bg-bg px-2 py-0.5 text-xs text-muted">
+                    ✓ {p}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-bold">{tk.priceSatang === 0 ? t.free : baht(tk.priceSatang, locale)}</div>
+            {tk.compareAtSatang && <div className="text-xs text-muted line-through">{baht(tk.compareAtSatang, locale)}</div>}
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+          <div className="text-xs text-muted">
+            {tk.wholeEvent && <span className="mr-2 font-medium text-ink">{t.wholeEvent}</span>}
+            {availability(o.remaining, o.saleState)}
+            {onSale && <span className="ml-2">· {t.perOrderMax(tk.maxPerOrder)}</span>}
+            {tk.requiresAdmission && <span className="mt-1 block">ⓘ {t.needsAdmission}</span>}
+          </div>
+          <Stepper value={n} max={onSale ? cap : 0} onChange={(v) => setQty((q) => ({ ...q, [key]: Math.max(0, v) }))} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-6">
+      <Steps locale={locale} current={step} />
+
+      {step === 1 && (
+        <section className="card mx-auto max-w-2xl p-6">
+          <h1 className="text-xl font-bold">{t.termsTitle}</h1>
+          <p className="mt-1 text-sm text-muted">{t.termsIntro}</p>
+          <ol className="mt-4 max-h-80 list-decimal space-y-2 overflow-y-auto rounded-xl bg-bg p-4 pl-8 text-sm">
+            {props.terms.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ol>
+          <label className="mt-4 flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+            <span>{t.acceptTerms}</span>
+          </label>
+          <div className="mt-6 flex justify-between gap-3">
+            <Link href={`/e/${props.slug}`} className="rounded-xl border border-line px-4 py-3 text-sm">
+              {t.back}
+            </Link>
+            <button className="btn-primary px-8" disabled={!agree} onClick={() => go({ accepted: "1" })}>
+              {t.next}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === 2 && (
+        <section className="mx-auto max-w-3xl">
+          <h1 className="text-xl font-bold">{t.chooseRound}</h1>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {rounds.map((r) => {
+              const open = r.status === "on_sale";
+              return (
+                <button
+                  key={r.date}
+                  disabled={!open}
+                  onClick={() => {
+                    setQty({});
+                    go({ round: r.date });
+                  }}
+                  className="card flex items-center justify-between gap-3 p-5 text-left transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span>
+                    <span className="block font-semibold">{r.label}</span>
+                    <span className="text-sm text-muted">{r.time}</span>
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${open ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-700"}`}
+                  >
+                    {t.roundStatus[r.status]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button className="mt-6 rounded-xl border border-line px-4 py-3 text-sm" onClick={() => go({ accepted: null })}>
+            {t.back}
+          </button>
+        </section>
+      )}
+
+      {step === 3 && round && (
+        <div className="grid gap-6 pb-28 lg:grid-cols-[1fr_360px] lg:pb-0">
+          <div className="space-y-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand/10 px-5 py-3">
+              <div>
+                <div className="text-xs text-muted">{t.round}</div>
+                <div className="font-semibold">
+                  {round.label} · {round.time}
+                </div>
+              </div>
+              <button className="text-sm font-medium text-brand underline" onClick={() => go({ round: null })}>
+                {t.changeRound}
+              </button>
+            </div>
+
+            <section>
+              <h2 className="mb-3 text-xl font-bold">{t.admission}</h2>
+              <div className="space-y-3">
+                {offers.filter((o) => tickets[o.ticketTypeId]!.kind !== "workshop").map(renderOffer)}
+              </div>
+              <form onSubmit={applyCode} className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label htmlFor="code" className="text-muted">
+                  {t.haveCode}
+                </label>
+                <input id="code" value={codeInput} onChange={(e) => setCodeInput(e.target.value)} className="field max-w-40 py-1.5" />
+                <button className="rounded-lg border border-line px-3 py-1.5 hover:border-brand">{t.applyCode}</button>
+                {props.unlock &&
+                  (props.unlock.valid ? (
+                    <span className="text-brand">{t.codeUnlocked(props.unlock.code)}</span>
+                  ) : (
+                    <span className="text-red-600">{t.codeInvalid}</span>
+                  ))}
+              </form>
+            </section>
+
+            {offers.some((o) => tickets[o.ticketTypeId]!.kind === "workshop") && (
+              <section>
+                <h2 className="mb-3 text-xl font-bold">{t.dayWorkshops}</h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {offers.filter((o) => tickets[o.ticketTypeId]!.kind === "workshop").map(renderOffer)}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <h2 className="mb-3 text-xl font-bold">{t.addons}</h2>
+              <div className="card divide-y divide-line">
+                {products.map((p) => {
+                  const key = `addon|${p.id}`;
+                  return (
+                    <div key={p.id} className="flex items-center justify-between gap-3 p-4">
+                      <div className="min-w-0">
+                        <div className="font-medium">{p.name}</div>
+                        <div className="text-xs text-muted">
+                          {p.description} · {availability(p.remaining, "on_sale")}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold">{baht(p.priceSatang, locale)}</span>
+                        <Stepper
+                          value={qty[key] ?? 0}
+                          max={Math.min(p.maxPerOrder, p.remaining ?? Infinity)}
+                          onChange={(v) => setQty((q) => ({ ...q, [key]: Math.max(0, v) }))}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-muted">ⓘ {t.noSeatMap}</p>
+            </section>
+          </div>
+
+          {/* สรุป: sticky ด้านขวาบนจอใหญ่ / แถบล่างบนมือถือ */}
+          <aside className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface p-4 shadow-lg lg:sticky lg:top-4 lg:self-start lg:rounded-2xl lg:border lg:shadow-none">
+            <h2 className="hidden font-semibold lg:block">{t.summary}</h2>
+            <p className="hidden text-xs text-muted lg:block">
+              {round.label} · {round.time}
+            </p>
+            <ul className="hidden space-y-2 py-3 text-sm lg:block">
+              {lines.length === 0 && <li className="text-muted">{t.noneSelected}</li>}
+              {lines.map((l) => (
+                <li key={l.key} className="flex justify-between gap-3">
+                  <span className="min-w-0">
+                    {l.quantity} × {l.label}
+                  </span>
+                  <span className="whitespace-nowrap">{l.unit === 0 ? t.free : baht(l.unit * l.quantity, locale)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between gap-4 lg:border-t lg:border-line lg:pt-3">
+              <div>
+                <div className="text-xs text-muted">{t.total}</div>
+                <div className="text-xl font-bold">{baht(total, locale)}</div>
+              </div>
+              <button className="btn-primary lg:hidden" disabled={!hasTicket || blocked || busy} onClick={confirm}>
+                {busy ? t.processing : t.confirmTickets}
+              </button>
+            </div>
+            {blocked && <p className="mt-2 text-xs text-amber-600">{t.workshopNeedsAdmission}</p>}
+            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+            <button className="btn-primary mt-3 hidden w-full lg:flex" disabled={!hasTicket || blocked || busy} onClick={confirm}>
+              {busy ? t.processing : t.confirmTickets}
+            </button>
+            <p className="mt-2 hidden text-xs text-muted lg:block">{t.holdNote(props.holdMinutes)}</p>
+          </aside>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stepper({ value, max, onChange }: { value: number; max: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        aria-label="-"
+        className="h-8 w-8 rounded-full border border-line text-lg leading-none disabled:opacity-30"
+        disabled={value <= 0}
+        onClick={() => onChange(value - 1)}
+      >
+        −
+      </button>
+      <span className="w-6 text-center text-sm font-semibold tabular-nums">{value}</span>
+      <button
+        type="button"
+        aria-label="+"
+        className="h-8 w-8 rounded-full border border-brand text-lg leading-none text-brand disabled:border-line disabled:text-muted disabled:opacity-30"
+        disabled={value >= max}
+        onClick={() => onChange(value + 1)}
+      >
+        +
+      </button>
+    </div>
+  );
+}

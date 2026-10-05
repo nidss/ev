@@ -59,7 +59,6 @@ export default async function CheckoutPage(props: {
         unlockCode={order.unlockCode}
         holdSecondsLeft={view.holdSecondsLeft}
         lastPaymentFailed={last?.status === "failed"}
-        terms={catalog.event.terms.map((x) => tr(x, locale))}
         initialBuyer={order.buyer}
         initialHolders={order.holders}
         initialPromo={promo ? { code: promo.code, label: tr(promo.label, locale) } : null}
