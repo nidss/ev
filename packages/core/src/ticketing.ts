@@ -1,7 +1,7 @@
 // business logic ของการซื้อบัตร: แสดงบัตร → จองที่นั่ง → checkout → จ่ายเงิน → ออกบัตร
 // prototype เก็บข้อมูลใน memory (MemoryStore) — ทุกขั้น "ตรวจ + หักความจุ" ทำแบบ synchronous
 // จึงเทียบเท่า transaction เดียวใน Postgres ตาม docs/TICKETING.md §3
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "./crypto";
 import type { z } from "zod";
 import { generateQrKeys, hashToken, newAccessToken, readableCode, signTicketQr, type QrKeys } from "./codes";
 import { TicketingError } from "./errors";
@@ -52,6 +52,20 @@ export class MemoryStore {
   ticketTypeTaken = new Map<string, number>();
   productTaken = new Map<string, number>();
   promoUsed = new Map<string, number>();
+}
+
+// แปลง store เป็น JSON และกลับ (prototype ใช้เก็บสถานะใน localStorage ของเบราว์เซอร์)
+export function serializeStore(store: MemoryStore): string {
+  return JSON.stringify(store, (_k, v) =>
+    v instanceof Map ? { __map: [...v.entries()] } : v instanceof Set ? { __set: [...v] } : v,
+  );
+}
+
+export function restoreStore(json: string): MemoryStore {
+  const data = JSON.parse(json, (_k, v) =>
+    v && typeof v === "object" && "__map" in v ? new Map(v.__map) : v && typeof v === "object" && "__set" in v ? new Set(v.__set) : v,
+  ) as Record<string, unknown>;
+  return Object.assign(new MemoryStore(), data);
 }
 
 export type SaleState = "on_sale" | "not_started" | "ended" | "sold_out";
@@ -438,7 +452,7 @@ export class TicketingService {
       amountSatang: pricing.totalSatang,
       method,
       description: `${this.catalog.event.shortCode} ${order.orderCode}`,
-      returnUrl: `${this.baseUrl}/t/${order.id}?token=${encodeURIComponent(accessToken)}`,
+      returnUrl: `${this.baseUrl}/t?order=${order.id}&token=${encodeURIComponent(accessToken)}`,
     });
     const payment: Payment = {
       id: randomUUID(),

@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { api } from "@/lib/local-api";
 
 export function ExportButton(props: { sponsorId: string; label: string; byLabel: string; disabled: boolean }) {
-  const router = useRouter();
   const [by, setBy] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -12,7 +11,7 @@ export function ExportButton(props: { sponsorId: string; label: string; byLabel:
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await fetch(`/api/sponsors/${props.sponsorId}/export`, {
+      const res = await api(`/api/sponsors/${props.sponsorId}/export`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ by }),
@@ -26,7 +25,6 @@ export function ExportButton(props: { sponsorId: string; label: string; byLabel:
       a.download = name;
       a.click();
       URL.revokeObjectURL(url);
-      router.refresh(); // แสดงประวัติการ export ล่าสุด
     } finally {
       setBusy(false);
     }

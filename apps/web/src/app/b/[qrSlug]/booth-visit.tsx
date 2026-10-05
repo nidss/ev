@@ -1,13 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Locale } from "@ev/core";
+import { api } from "@/lib/local-api";
 import { od } from "@/lib/onsite-i18n";
 
 export function BoothVisit(props: { locale: Locale; qrSlug: string; attendeeName: string | null; consented: boolean }) {
   const t = od(props.locale);
-  const router = useRouter();
   const [ticketCode, setTicketCode] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +29,7 @@ export function BoothVisit(props: { locale: Locale; qrSlug: string; attendeeName
 
   async function act(action: "visit" | "interested" | "request_info", show = true) {
     setBusy(true);
-    const res = await fetch(`/api/booths/${props.qrSlug}/action`, {
+    const res = await api(`/api/booths/${props.qrSlug}/action`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action }),
@@ -43,24 +42,22 @@ export function BoothVisit(props: { locale: Locale; qrSlug: string; attendeeName
     e.preventDefault();
     setError(null);
     setBusy(true);
-    const res = await fetch(`/api/booths/${props.qrSlug}/identify`, {
+    const res = await api(`/api/booths/${props.qrSlug}/identify`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ticketCode, email }),
     });
     setBusy(false);
     if (!res.ok) return setError(t.results.unknown!);
-    router.refresh();
   }
 
   async function logout() {
-    await fetch(`/api/booths/${props.qrSlug}/identify`, { method: "DELETE" });
+    await api(`/api/booths/${props.qrSlug}/identify`, { method: "DELETE" });
     try {
       sessionStorage.removeItem(`ev-visit-${props.qrSlug}`);
     } catch {
       // ignore
     }
-    router.refresh();
   }
 
   if (!props.attendeeName) {

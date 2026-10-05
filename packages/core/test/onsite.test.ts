@@ -206,3 +206,19 @@ describe("dashboard + seed", () => {
     expect(d.booths[0]!.uniqueVisitors).toBeGreaterThan(0);
   });
 });
+
+describe("persistence", () => {
+  it("round-trips the store and keys through JSON", async () => {
+    const { serializeStore, restoreStore, exportQrKeys, importQrKeys, verifyTicketQr } = await import("../src");
+    const { ticketing, onsite, buy, id } = setup();
+    const a = await buy("tt_conf");
+    onsite.checkIn({ id: id(), code: a.qrToken, checkpointId: "cp_gate_a", operatingDate: DAY1, deviceName: "t" });
+    const store = restoreStore(serializeStore(ticketing.store));
+    expect(store.attendees.get(a.id)?.ticketCode).toBe(a.ticketCode);
+    expect(store.checkins.size).toBe(1);
+    expect(store.processedWebhookEvents instanceof Set).toBe(true);
+    expect(store.eventTaken).toBe(ticketing.store.eventTaken);
+    const keys = importQrKeys(exportQrKeys(ticketing.qrKeys));
+    expect(verifyTicketQr(keys.publicKey, a.qrToken)).toBe(true);
+  });
+});

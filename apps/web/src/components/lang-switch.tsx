@@ -1,20 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import type { Locale } from "@ev/core";
 import { dict } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale";
 
-export function LangSwitch({ locale }: { locale: Locale }) {
-  const router = useRouter();
-  const next: Locale = locale === "th" ? "en" : "th";
+export function LangSwitch() {
+  const { locale, setLocale } = useLocale();
   return (
     <button
       type="button"
       className="rounded-full border border-line px-3 py-1 text-xs font-medium hover:border-brand"
-      onClick={() => {
-        document.cookie = `lang=${next}; path=/; max-age=31536000; samesite=lax`;
-        router.refresh();
-      }}
+      onClick={() => setLocale(locale === "th" ? "en" : "th")}
     >
       {dict(locale).otherLang}
     </button>

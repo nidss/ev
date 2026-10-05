@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Locale } from "@ev/core";
 import {
@@ -22,6 +23,7 @@ import {
   type QueuedScan,
   type Snapshot,
 } from "@/lib/offline-checkin";
+import { api } from "@/lib/local-api";
 import { od } from "@/lib/onsite-i18n";
 
 interface ResultView {
@@ -84,7 +86,7 @@ export function CheckinApp(props: {
   const fullName = (a: SnapshotAttendee | null) => (a ? `${a.firstName} ${a.lastName}` : "—");
 
   const refreshSnapshot = useCallback(async () => {
-    const res = await fetch("/api/onsite/snapshot", { cache: "no-store" });
+    const res = await api("/api/onsite/snapshot", { cache: "no-store" });
     if (res.ok) {
       const s = (await res.json()) as Snapshot;
       setSnapshot(s);
@@ -93,7 +95,7 @@ export function CheckinApp(props: {
   }, []);
 
   const refreshRecent = useCallback(async () => {
-    const res = await fetch(`/api/onsite/recent?date=${date}`, { cache: "no-store" });
+    const res = await api(`/api/onsite/recent?date=${date}`, { cache: "no-store" });
     if (!res.ok) return;
     const data = (await res.json()) as {
       recent: { checkin: { id: string; scannedAt: string; result: string; checkpointId: string; rawCode: string | null }; attendee: SnapshotAttendee | null }[];
@@ -121,7 +123,7 @@ export function CheckinApp(props: {
 
   async function sync(q: QueuedScan[]) {
     if (q.length === 0) return;
-    const res = await fetch("/api/onsite/sync", {
+    const res = await api("/api/onsite/sync", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -163,7 +165,7 @@ export function CheckinApp(props: {
           admissionTicketTypeIds: snapshot.admissionTicketTypeIds,
           operatingDate: date,
           qrSignatureValid:
-            parsed.kind === "qr" ? parsed.eventShort === snapshot.eventShort && (await verifyQrOffline(snapshot.qrPublicKeySpki, parsed.token)) !== false : null,
+            parsed.kind === "qr" ? parsed.eventShort === snapshot.eventShort && verifyQrOffline(snapshot.qrPublicKey, parsed.token) : null,
           acceptedBefore: attendee ? keys.has(acceptedKey(attendee.id, checkpointId, date)) : false,
           entryCheckConfirmed: confirmed,
         });
@@ -188,7 +190,7 @@ export function CheckinApp(props: {
         saveQueue(next);
         return;
       }
-      const res = await fetch("/api/onsite/checkins", {
+      const res = await api("/api/onsite/checkins", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, code, checkpointId, operatingDate: date, entryCheckConfirmed: confirmed, deviceName: device }),
@@ -218,7 +220,7 @@ export function CheckinApp(props: {
       );
       return;
     }
-    const res = await fetch(`/api/onsite/search?q=${encodeURIComponent(q)}`);
+    const res = await api(`/api/onsite/search?q=${encodeURIComponent(q)}`);
     if (res.ok) setFound(((await res.json()) as { results: SnapshotAttendee[] }).results.slice(0, 10));
   }
 
@@ -458,14 +460,14 @@ function ResultCard(props: {
       {a && (view.result === "accepted" || view.result === "already_in") && (
         <div className="mt-4 grid gap-3 rounded-xl bg-white/70 p-4 text-ink sm:grid-cols-[1fr_auto]">
           <WristbandForm attendee={a} locale={props.locale} disabled={props.offline} onPaired={props.onPaired} />
-          <a
-            href={`/org/${props.slug}/badge/${a.id}`}
+          <Link
+            href={`/org/${props.slug}/badge?id=${a.id}`}
             target="_blank"
             rel="noreferrer"
             className="self-end rounded-xl border border-line bg-surface px-4 py-2 text-center text-sm font-medium"
           >
             🖨 {t.printBadge}
-          </a>
+          </Link>
         </div>
       )}
     </div>
@@ -484,7 +486,7 @@ function WristbandForm(props: {
 
   async function pair(value: string) {
     setError(null);
-    const res = await fetch("/api/onsite/wristband", {
+    const res = await api("/api/onsite/wristband", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ attendeeId: props.attendee.id, uid: value }),

@@ -4,7 +4,7 @@
 และขยาย data model ใน [ARCHITECTURE.md](./ARCHITECTURE.md) ให้รองรับ
 
 > **สถานะ:** มี prototype ที่ใช้งานได้แล้ว (`packages/core` + `apps/web`) ใช้ราคาบัตร mock (§12) และ payment gateway จำลอง
-> ข้อมูลเก็บใน memory ยังไม่ต่อ Postgres — วิธีรันดูที่ [README](../README.md)
+> prototype รันในเบราว์เซอร์ทั้งหมด (ขึ้น GitHub Pages) ข้อมูลเก็บใน localStorage ยังไม่ต่อ Postgres — วิธีรันดูที่ [README](../README.md)
 
 ---
 
@@ -441,7 +441,7 @@ Index: `(event_id, status)`, `(status, expires_at)` (ให้ worker หา ord
 
 ### ส่วนที่ prototype ทำง่ายกว่าแบบในเอกสาร
 
-- เก็บข้อมูลใน memory, ปล่อยที่นั่งที่หมดเวลาแบบ lazy (ตอนมี request) แทน worker
+- เก็บข้อมูลใน localStorage ของเบราว์เซอร์, ปล่อยที่นั่งที่หมดเวลาแบบ lazy (ตอนมีการเรียกใช้) แทน worker
 - ผู้ซื้อกรอกข้อมูลผู้ถือบัตรทุกใบตอน checkout เลย (ยังไม่มีลิงก์ให้เจ้าของบัตรกรอกเอง)
 - consent "แชร์ข้อมูลให้ sponsor" ของผู้ซื้อใช้กับบัตรของผู้ซื้อเองเท่านั้น บัตรของคนอื่นใน order ถือว่ายังไม่ได้ consent
 - workshop / add-on ต้องมีบัตรเข้างานใน**order เดียวกัน** (ยังไม่เช็คบัตรที่เคยซื้อไว้ใน order ก่อน)

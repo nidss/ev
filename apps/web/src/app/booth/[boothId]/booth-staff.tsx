@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { LeadRating, Locale } from "@ev/core";
 import type { SnapshotAttendee } from "@ev/core/checkin-rules";
 import { ScanInput } from "@/components/scan-input";
 import { load, save } from "@/lib/offline-checkin";
+import { api } from "@/lib/local-api";
 import { od } from "@/lib/onsite-i18n";
 
 export interface BoothLeadRow {
@@ -33,7 +33,6 @@ export function BoothStaff(props: {
 }) {
   const { locale } = props;
   const t = od(locale);
-  const router = useRouter();
   const [device, setDevice] = useState(`${props.boothCode} staff`);
   const [last, setLast] = useState<ScanResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,13 +46,12 @@ export function BoothStaff(props: {
   async function scan(code: string) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/booth-staff/${props.boothId}/scan`, {
+      const res = await api(`/api/booth-staff/${props.boothId}/scan`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id: crypto.randomUUID(), code, deviceName: device }),
       });
       setLast(res.ok ? ((await res.json()) as ScanResult) : { result: "unknown" });
-      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -88,7 +86,7 @@ export function BoothStaff(props: {
         />
       </div>
 
-      {last && <LastScan key={JSON.stringify(last)} last={last} locale={locale} boothId={props.boothId} onSaved={() => router.refresh()} />}
+      {last && <LastScan key={JSON.stringify(last)} last={last} locale={locale} boothId={props.boothId} onSaved={() => {}} />}
 
       <section className="card p-4">
         <h2 className="font-semibold">{t.leadsOfBooth}</h2>
@@ -148,7 +146,7 @@ function LastScan(props: { last: ScanResult; locale: Locale; boothId: string; on
   }
   async function saveLead() {
     if (last.result !== "recorded" || !last.consented) return;
-    const res = await fetch(`/api/booth-staff/${props.boothId}/leads/${last.lead.id}`, {
+    const res = await api(`/api/booth-staff/${props.boothId}/leads/${last.lead.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ rating, notes }),

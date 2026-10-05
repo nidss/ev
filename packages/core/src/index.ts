@@ -10,3 +10,4 @@ export { createMockCatalog } from "./mock-data";
 export * from "./checkin-rules";
 export * from "./onsite";
 export { seedDemo } from "./seed";
+export * from "./crypto";

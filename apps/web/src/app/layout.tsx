@@ -1,28 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LangSwitch } from "@/components/lang-switch";
-import { getLocale } from "@/lib/server";
+import { LocaleProvider } from "@/lib/locale";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "EV Tickets",
-  description: "Event registration & ticketing prototype",
+  description: "Event registration, ticketing and on-site prototype",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang={locale}>
+    <html lang="th">
       <body className="min-h-screen font-sans antialiased">
-        <header className="border-b border-line bg-surface">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <Link href="/" className="text-sm font-bold tracking-wide text-brand">
-              EV · Tickets
-            </Link>
-            <LangSwitch locale={locale} />
-          </div>
-        </header>
-        {children}
+        <LocaleProvider>
+          <header className="border-b border-line bg-surface">
+            <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+              <Link href="/" className="text-sm font-bold tracking-wide text-brand">
+                EV · Tickets
+              </Link>
+              <LangSwitch />
+            </div>
+          </header>
+          {children}
+        </LocaleProvider>
       </body>
     </html>
   );

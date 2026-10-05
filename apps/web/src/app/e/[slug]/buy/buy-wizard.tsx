@@ -7,6 +7,7 @@ import type { EventRound, Locale, OrderLineInput, SaleState, TicketKind } from "
 import { Steps } from "@/components/steps";
 import { baht } from "@/lib/format";
 import { dict, errorText } from "@/lib/i18n";
+import { api } from "@/lib/local-api";
 
 export interface WizardTicket {
   id: string;
@@ -134,7 +135,7 @@ export function BuyWizard(props: {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/orders", {
+      const res = await api("/api/orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -146,11 +147,10 @@ export function BuyWizard(props: {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.code);
-      router.push(`/e/${props.slug}/checkout/${data.orderId}?token=${encodeURIComponent(data.token)}`);
+      router.push(`/e/${props.slug}/checkout?order=${data.orderId}&token=${encodeURIComponent(data.token)}`);
     } catch (e) {
       setError(errorText(locale, (e as Error).message));
       setBusy(false);
-      router.refresh(); // ดึงจำนวนที่เหลือล่าสุด
     }
   }
 
@@ -159,7 +159,7 @@ export function BuyWizard(props: {
     const sp = new URLSearchParams(params.toString());
     if (codeInput.trim()) sp.set("code", codeInput.trim());
     else sp.delete("code");
-    router.replace(`?${sp.toString()}`, { scroll: false }); // โหลดข้อมูลใหม่จาก server ให้บัตรที่ปลดล็อกโผล่
+    router.replace(`?${sp.toString()}`, { scroll: false }); // หน้าอ่าน code จาก URL แล้วแสดงบัตรที่ปลดล็อก
   }
 
   const availability = (remaining: number | null, state: SaleState) => {

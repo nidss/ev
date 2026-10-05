@@ -4,6 +4,9 @@ import type { Locale } from "@ev/core";
 const th = {
   prototypeBanner: "Prototype: หน้า staff / sponsor / ผู้จัดยังไม่มีระบบ login ข้อมูลเป็นข้อมูลสมมติ",
   menu: "เมนู",
+  browserNote: "เวอร์ชันนี้รันในเบราว์เซอร์ทั้งหมด ข้อมูลเก็บในเบราว์เซอร์นี้เท่านั้น — เปิดหลายแท็บได้ (เช่น แท็บเช็คอิน + แท็บ dashboard) ตัวเลขจะอัปเดตตามกัน",
+  resetDemo: "ล้างข้อมูลและสร้างข้อมูลตัวอย่างใหม่",
+  resetConfirm: "ล้างข้อมูลทั้งหมดในเบราว์เซอร์นี้แล้วสร้างข้อมูลตัวอย่างใหม่?",
   roles: {
     attendee: ["ผู้เข้างาน", "หน้างาน ซื้อบัตร / ลงทะเบียน"],
     checkin: ["Staff เช็คอิน", "สแกน QR / รหัสบัตร / สายรัด RFID ที่ประตู"],
@@ -13,7 +16,7 @@ const th = {
   },
   dashboard: "Dashboard ผู้จัดงาน",
   day: "วันที่หน้างาน",
-  liveNote: "อัปเดตอัตโนมัติทุก 5 วินาที",
+  liveNote: "อัปเดตทันทีเมื่อมีการเช็คอิน / สแกนบูธ (รวมจากแท็บอื่น)",
   registered: "ลงทะเบียนทั้งหมด",
   checkedInToday: "เข้างานวันนี้",
   ofExpected: (n: number) => `จากที่มีบัตรวันนี้ ${n.toLocaleString("th-TH")} คน`,
@@ -132,6 +135,9 @@ type Dict = typeof th;
 const en: Dict = {
   prototypeBanner: "Prototype: staff / sponsor / organizer pages have no login yet. All data is fictional.",
   menu: "Menu",
+  browserNote: "This version runs entirely in your browser and keeps data in this browser only. Open several tabs (e.g. check-in + dashboard) and they update together.",
+  resetDemo: "Clear data and rebuild sample data",
+  resetConfirm: "Clear all data in this browser and rebuild the sample data?",
   roles: {
     attendee: ["Attendee", "Event page, buy tickets / register"],
     checkin: ["Check-in staff", "Scan QR / ticket code / RFID wristband at the gate"],
@@ -141,7 +147,7 @@ const en: Dict = {
   },
   dashboard: "Organizer dashboard",
   day: "Event day",
-  liveNote: "Updates every 5 seconds",
+  liveNote: "Updates instantly on check-ins and booth scans (including other tabs)",
   registered: "Registered",
   checkedInToday: "Checked in today",
   ofExpected: (n) => `of ${n.toLocaleString("en-US")} with a ticket for today`,

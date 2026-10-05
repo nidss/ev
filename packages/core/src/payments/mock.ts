@@ -1,6 +1,6 @@
 // payment gateway จำลอง: ไม่มีเงินจริง ผู้ซื้อกดปุ่ม "จ่ายสำเร็จ / ไม่สำเร็จ" ในหน้า mock
 // แต่ยังส่งผลกลับผ่าน webhook ที่เซ็น HMAC เหมือน gateway จริง เพื่อให้ทดสอบ flow ฝั่งเราได้ครบ
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { constantTimeEqual, hmacSha256Hex, randomUUID } from "../crypto";
 import type { PaymentMethod } from "../types";
 import {
   InvalidWebhookError,
@@ -45,7 +45,15 @@ export class MockPaymentProvider implements PaymentProvider {
       refundedSatang: 0,
       createdAt: this.now().toISOString(),
     });
-    return { providerChargeId: id, redirectUrl: `${this.options.payPageBaseUrl}/${id}` };
+    return { providerChargeId: id, redirectUrl: `${this.options.payPageBaseUrl}?charge=${id}` };
+  }
+
+  exportCharges(): MockCharge[] {
+    return [...this.charges.values()];
+  }
+
+  importCharges(list: MockCharge[]) {
+    this.charges = new Map(list.map((c) => [c.id, c]));
   }
 
   getCharge(id: string): MockCharge | undefined {
@@ -72,9 +80,7 @@ export class MockPaymentProvider implements PaymentProvider {
   async verifyWebhook(headers: Record<string, string | null | undefined>, rawBody: string): Promise<PaymentEvent> {
     const given = headers[MOCK_SIGNATURE_HEADER];
     if (!given) throw new InvalidWebhookError("missing signature");
-    const expected = Buffer.from(this.sign(rawBody));
-    const actual = Buffer.from(given);
-    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+    if (!constantTimeEqual(this.sign(rawBody), given)) {
       throw new InvalidWebhookError("bad signature");
     }
     return JSON.parse(rawBody) as PaymentEvent;
@@ -89,7 +95,7 @@ export class MockPaymentProvider implements PaymentProvider {
   }
 
   private sign(body: string): string {
-    return createHmac("sha256", this.options.secret).update(body).digest("hex");
+    return hmacSha256Hex(this.options.secret, body);
   }
 
   private now(): Date {

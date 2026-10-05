@@ -1,6 +1,6 @@
 // business logic หน้างาน: เช็คอิน, สายรัด RFID, สแกนบูธ / lead, sponsor portal, dashboard ผู้จัด
 // ใช้ store และ catalog ชุดเดียวกับ TicketingService
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { constantTimeEqual, hmacSha256B64url, randomUUID, toBase64url } from "./crypto";
 import {
   acceptedKey,
   evaluateCheckin,
@@ -109,7 +109,7 @@ export class OnsiteService {
   snapshot() {
     return {
       eventShort: this.catalog.event.shortCode,
-      qrPublicKeySpki: this.ticketing.qrKeys.publicKey.export({ type: "spki", format: "der" }).toString("base64"),
+      qrPublicKey: toBase64url(this.ticketing.qrKeys.publicKey),
       admissionTicketTypeIds: this.admissionTicketTypeIds(),
       checkpoints: this.checkpoints(),
       attendees: [...this.store.attendees.values()].map((a) => this.snapshotAttendee(a)),
@@ -578,7 +578,7 @@ export class OnsiteService {
 
 // cookie ยืนยันตัว attendee ที่บูธ: "<attendeeId>.<hmac>"
 export function signAttendeeCookie(secret: string, attendeeId: string): string {
-  return `${attendeeId}.${createHmac("sha256", secret).update(attendeeId).digest("base64url")}`;
+  return `${attendeeId}.${hmacSha256B64url(secret, attendeeId)}`;
 }
 
 export function verifyAttendeeCookie(secret: string, value: string | undefined): string | null {
@@ -586,9 +586,7 @@ export function verifyAttendeeCookie(secret: string, value: string | undefined):
   const i = value.lastIndexOf(".");
   if (i < 0) return null;
   const id = value.slice(0, i);
-  const expected = Buffer.from(signAttendeeCookie(secret, id));
-  const given = Buffer.from(value);
-  return expected.length === given.length && timingSafeEqual(expected, given) ? id : null;
+  return constantTimeEqual(signAttendeeCookie(secret, id), value) ? id : null;
 }
 
 function csvCell(v: string): string {
