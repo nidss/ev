@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { EventRound, Locale, OrderLineInput, SaleState, TicketKind } from "@ev/core";
@@ -50,13 +49,12 @@ export interface WizardProduct {
 const ALMOST_FULL = 10;
 const offerKey = (o: { ticketTypeId: string; slotId: string | null }) => `${o.ticketTypeId}|${o.slotId ?? ""}`;
 
-// ขั้น 1–3 ของการซื้อบัตร: ยอมรับเงื่อนไข → เลือกรอบ → เลือกบัตร
-// ขั้นปัจจุบันเก็บใน URL (?accepted=1&round=YYYY-MM-DD) เพื่อให้ปุ่ม back ของเบราว์เซอร์และการ reload ใช้ได้
-export function BuyWizard(props: {
+// เลือกบัตรบนหน้างาน (แบบ Zipevent): เลือกวัน → เลือกจำนวนบัตร / workshop / add-on → ยอมรับเงื่อนไข → ยืนยันบัตร
+// วันที่เลือกเก็บใน URL (?round=YYYY-MM-DD) ให้ reload แล้วยังอยู่วันเดิม
+export function TicketSelector(props: {
   locale: Locale;
   slug: string;
   holdMinutes: number;
-  terms: string[];
   rounds: WizardRound[];
   tickets: Record<string, WizardTicket>;
   products: WizardProduct[];
@@ -67,9 +65,10 @@ export function BuyWizard(props: {
   const router = useRouter();
   const params = useSearchParams();
 
-  const accepted = params.get("accepted") === "1";
-  const round = rounds.find((r) => r.date === params.get("round") && r.status === "on_sale") ?? null;
-  const step: 1 | 2 | 3 = !accepted ? 1 : !round ? 2 : 3;
+  const round =
+    rounds.find((r) => r.date === params.get("round") && r.status === "on_sale") ??
+    rounds.find((r) => r.status === "on_sale") ??
+    null;
 
   const [agree, setAgree] = useState(false);
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -83,8 +82,7 @@ export function BuyWizard(props: {
       if (v === null) sp.delete(k);
       else sp.set(k, v);
     }
-    window.history.pushState(null, "", `?${sp.toString()}`);
-    window.scrollTo({ top: 0 });
+    window.history.replaceState(null, "", `?${sp.toString()}`);
   }
 
   // ---------- ขั้น 3: คำนวณรายการที่เลือก ----------
@@ -215,86 +213,51 @@ export function BuyWizard(props: {
     );
   }
 
+  const canConfirm = hasTicket && !blocked && agree && !busy;
+
   return (
-    <div className="mt-2 space-y-6">
-      <Steps locale={locale} current={step} />
+    <section id="tickets" className="scroll-mt-4 space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-2xl font-bold">{t.tickets}</h2>
+        <Steps locale={locale} current={1} />
+      </div>
 
-      {step === 1 && (
-        <section className="card mx-auto max-w-2xl p-6">
-          <h1 className="text-xl font-bold">{t.termsTitle}</h1>
-          <p className="mt-1 text-sm text-muted">{t.termsIntro}</p>
-          <ol className="mt-4 max-h-80 list-decimal space-y-2 overflow-y-auto rounded-xl bg-bg p-4 pl-8 text-sm">
-            {props.terms.map((x) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ol>
-          <label className="mt-4 flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-            <span>{t.acceptTerms}</span>
-          </label>
-          <div className="mt-6 flex justify-between gap-3">
-            <Link href={`/e/${props.slug}`} className="rounded-xl border border-line px-4 py-3 text-sm">
-              {t.back}
-            </Link>
-            <button className="btn-primary px-8" disabled={!agree} onClick={() => go({ accepted: "1" })}>
-              {t.next}
+      {/* เลือกวัน (รอบ) */}
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t.chooseRound}>
+        {rounds.map((r) => {
+          const open = r.status === "on_sale";
+          const selected = round?.date === r.date;
+          return (
+            <button
+              key={r.date}
+              role="radio"
+              aria-checked={selected}
+              disabled={!open}
+              onClick={() => {
+                if (selected) return;
+                setQty({});
+                go({ round: r.date });
+              }}
+              className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                selected ? "border-brand bg-brand/10" : "border-line bg-surface hover:border-brand"
+              }`}
+            >
+              <span className="block text-sm font-semibold">{r.label}</span>
+              <span className="text-xs text-muted">
+                {r.time} · {t.roundStatus[r.status]}
+              </span>
             </button>
-          </div>
-        </section>
-      )}
+          );
+        })}
+      </div>
 
-      {step === 2 && (
-        <section className="mx-auto max-w-3xl">
-          <h1 className="text-xl font-bold">{t.chooseRound}</h1>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {rounds.map((r) => {
-              const open = r.status === "on_sale";
-              return (
-                <button
-                  key={r.date}
-                  disabled={!open}
-                  onClick={() => {
-                    setQty({});
-                    go({ round: r.date });
-                  }}
-                  className="card flex items-center justify-between gap-3 p-5 text-left transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <span>
-                    <span className="block font-semibold">{r.label}</span>
-                    <span className="text-sm text-muted">{r.time}</span>
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${open ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-700"}`}
-                  >
-                    {t.roundStatus[r.status]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <button className="mt-6 rounded-xl border border-line px-4 py-3 text-sm" onClick={() => go({ accepted: null })}>
-            {t.back}
-          </button>
-        </section>
-      )}
-
-      {step === 3 && round && (
-        <div className="grid gap-6 pb-28 lg:grid-cols-[1fr_360px] lg:pb-0">
+      {!round ? (
+        <p className="card p-6 text-sm text-muted">{t.roundStatus.closed}</p>
+      ) : (
+        <div className="grid gap-6 pb-40 lg:grid-cols-[1fr_360px] lg:pb-0">
           <div className="space-y-8">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand/10 px-5 py-3">
-              <div>
-                <div className="text-xs text-muted">{t.round}</div>
-                <div className="font-semibold">
-                  {round.label} · {round.time}
-                </div>
-              </div>
-              <button className="text-sm font-medium text-brand underline" onClick={() => go({ round: null })}>
-                {t.changeRound}
-              </button>
-            </div>
-
-            <section>
-              <h2 className="mb-3 text-xl font-bold">{t.admission}</h2>
+            <div>
+              <h3 className="mb-3 text-lg font-bold">{t.admission}</h3>
               <div className="space-y-3">
                 {offers.filter((o) => tickets[o.ticketTypeId]!.kind !== "workshop").map(renderOffer)}
               </div>
@@ -311,19 +274,19 @@ export function BuyWizard(props: {
                     <span className="text-red-600">{t.codeInvalid}</span>
                   ))}
               </form>
-            </section>
+            </div>
 
             {offers.some((o) => tickets[o.ticketTypeId]!.kind === "workshop") && (
-              <section>
-                <h2 className="mb-3 text-xl font-bold">{t.dayWorkshops}</h2>
+              <div>
+                <h3 className="mb-3 text-lg font-bold">{t.dayWorkshops}</h3>
                 <div className="grid gap-3 md:grid-cols-2">
                   {offers.filter((o) => tickets[o.ticketTypeId]!.kind === "workshop").map(renderOffer)}
                 </div>
-              </section>
+              </div>
             )}
 
-            <section>
-              <h2 className="mb-3 text-xl font-bold">{t.addons}</h2>
+            <div>
+              <h3 className="mb-3 text-lg font-bold">{t.addons}</h3>
               <div className="card divide-y divide-line">
                 {products.map((p) => {
                   const key = `addon|${p.id}`;
@@ -348,12 +311,12 @@ export function BuyWizard(props: {
                 })}
               </div>
               <p className="mt-3 text-xs text-muted">ⓘ {t.noSeatMap}</p>
-            </section>
+            </div>
           </div>
 
           {/* สรุป: sticky ด้านขวาบนจอใหญ่ / แถบล่างบนมือถือ */}
           <aside className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface p-4 shadow-lg lg:sticky lg:top-4 lg:self-start lg:rounded-2xl lg:border lg:shadow-none">
-            <h2 className="hidden font-semibold lg:block">{t.summary}</h2>
+            <h3 className="hidden font-semibold lg:block">{t.summary}</h3>
             <p className="hidden text-xs text-muted lg:block">
               {round.label} · {round.time}
             </p>
@@ -373,20 +336,29 @@ export function BuyWizard(props: {
                 <div className="text-xs text-muted">{t.total}</div>
                 <div className="text-xl font-bold">{baht(total, locale)}</div>
               </div>
-              <button className="btn-primary lg:hidden" disabled={!hasTicket || blocked || busy} onClick={confirm}>
+              <button className="btn-primary lg:hidden" disabled={!canConfirm} onClick={confirm}>
                 {busy ? t.processing : t.confirmTickets}
               </button>
             </div>
+            <label className="mt-2 flex items-start gap-2 text-xs lg:mt-3 lg:text-sm">
+              <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+              <span>
+                {t.acceptTermsShort}{" "}
+                <a href="#terms" className="text-brand underline">
+                  {t.readTerms}
+                </a>
+              </span>
+            </label>
             {blocked && <p className="mt-2 text-xs text-amber-600">{t.workshopNeedsAdmission}</p>}
             {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-            <button className="btn-primary mt-3 hidden w-full lg:flex" disabled={!hasTicket || blocked || busy} onClick={confirm}>
+            <button className="btn-primary mt-3 hidden w-full lg:flex" disabled={!canConfirm} onClick={confirm}>
               {busy ? t.processing : t.confirmTickets}
             </button>
             <p className="mt-2 hidden text-xs text-muted lg:block">{t.holdNote(props.holdMinutes)}</p>
           </aside>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

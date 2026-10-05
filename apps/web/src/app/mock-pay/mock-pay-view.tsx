@@ -24,7 +24,7 @@ export function MockPayView() {
   return (
     <main className="mx-auto max-w-md px-4 py-6">
       <div className="mb-4">
-        <Steps locale={locale} current={5} />
+        <Steps locale={locale} current={3} />
       </div>
       <p className="rounded-xl bg-amber-100 p-3 text-center text-xs font-semibold text-amber-900">{t.mockBanner}</p>
       <div className="card mt-4 p-6">

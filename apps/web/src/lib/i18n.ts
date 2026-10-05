@@ -2,7 +2,7 @@
 import type { Locale } from "@ev/core";
 
 const th = {
-  steps: ["ยอมรับเงื่อนไข", "เลือกรอบ", "เลือกบัตร", "กรอกข้อมูล", "ชำระเงิน"],
+  steps: ["เลือกบัตร", "กรอกข้อมูล", "ชำระเงิน"],
   buyNow: "ซื้อบัตร",
   date: "วันที่",
   time: "เวลา",
@@ -13,6 +13,8 @@ const th = {
   termsTitle: "เงื่อนไขการซื้อบัตร",
   termsIntro: "กรุณาอ่านเงื่อนไขก่อนเลือกบัตร",
   acceptTerms: "ฉันได้อ่านและยอมรับเงื่อนไขการซื้อบัตรทั้งหมด",
+  acceptTermsShort: "ฉันยอมรับเงื่อนไขการซื้อบัตร",
+  readTerms: "อ่านเงื่อนไข",
   holdTerm: (m: number) => `เมื่อกดยืนยันบัตร ระบบจะกันที่นั่งไว้ ${m} นาที หากไม่ชำระเงินภายในเวลา ที่นั่งจะถูกปล่อยคืน`,
   limitTerm: "จำนวนบัตรสูงสุดต่อคำสั่งซื้อเป็นไปตามที่ระบุในแต่ละประเภทบัตร",
   next: "ถัดไป",
@@ -147,7 +149,7 @@ const th = {
 type Dict = typeof th;
 
 const en: Dict = {
-  steps: ["Accept terms", "Choose date", "Choose tickets", "Your details", "Payment"],
+  steps: ["Choose tickets", "Your details", "Payment"],
   buyNow: "Buy tickets",
   date: "Date",
   time: "Time",
@@ -158,6 +160,8 @@ const en: Dict = {
   termsTitle: "Ticket purchase terms",
   termsIntro: "Please read the terms before choosing tickets.",
   acceptTerms: "I have read and accept all ticket purchase terms",
+  acceptTermsShort: "I accept the ticket purchase terms",
+  readTerms: "Read terms",
   holdTerm: (m) => `Once you confirm your tickets they are held for ${m} minutes. Unpaid tickets are released after that.`,
   limitTerm: "The maximum number of tickets per order is shown for each ticket type.",
   next: "Next",

@@ -204,7 +204,7 @@ export function CheckoutForm(props: {
 
   return (
     <form onSubmit={onSubmit} className="mt-2 space-y-6">
-      <Steps locale={locale} current={phase === "info" ? 4 : 5} />
+      <Steps locale={locale} current={phase === "info" ? 2 : 3} />
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,8 +1,8 @@
 import type { Locale } from "@ev/core";
 import { dict } from "@/lib/i18n";
 
-// แถบขั้นตอนการซื้อบัตร: 1 เงื่อนไข · 2 เลือกรอบ · 3 เลือกบัตร · 4 กรอกข้อมูล · 5 ชำระเงิน
-export function Steps({ locale, current }: { locale: Locale; current: 1 | 2 | 3 | 4 | 5 }) {
+// แถบขั้นตอนการซื้อบัตร: 1 เลือกบัตร (หน้างาน) · 2 กรอกข้อมูล · 3 ชำระเงิน
+export function Steps({ locale, current }: { locale: Locale; current: 1 | 2 | 3 }) {
   const labels = dict(locale).steps;
   return (
     <ol className="flex items-center gap-1 overflow-x-auto pb-1 text-xs sm:gap-2 sm:text-sm">
