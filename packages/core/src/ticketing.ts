@@ -9,7 +9,11 @@ import type { PaymentProvider } from "./payments/provider";
 import { priceOrder, type PricingResult } from "./pricing";
 import type {
   Attendee,
+  BoothScan,
   Catalog,
+  Checkin,
+  Lead,
+  LeadExport,
   Holder,
   Order,
   OrderItem,
@@ -37,6 +41,11 @@ export class MemoryStore {
   attendees = new Map<string, Attendee>();
   refunds: Refund[] = [];
   processedWebhookEvents = new Set<string>();
+  // หน้างาน
+  checkins = new Map<string, Checkin>();
+  boothScans = new Map<string, BoothScan>();
+  leads = new Map<string, Lead>(); // key: boothId|attendeeId
+  leadExports: LeadExport[] = [];
   // ตัวนับความจุ (= taken ใน data model): นับทั้งที่จองรอจ่ายและที่ขายแล้ว
   eventTaken = 0;
   slotTaken = new Map<string, number>();
@@ -603,6 +612,8 @@ export class TicketingService {
           shareWithSponsors: shareConsent && person.email?.toLowerCase() === buyer.email.toLowerCase(),
           status: "registered",
           createdAt: nowIso,
+          rfidUid: null,
+          firstCheckedInAt: null,
         });
       }
     }

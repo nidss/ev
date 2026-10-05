@@ -96,12 +96,47 @@ export interface PromoCode {
   validTo: string | null;
 }
 
+export type CheckpointKind = "entrance" | "workshop" | "vip_area";
+
+// จุดเช็คอิน เช่น ประตูหลัก, ห้อง workshop, VIP lounge
+export interface Checkpoint {
+  id: string;
+  eventId: string;
+  name: I18n;
+  kind: CheckpointKind;
+  allowedTicketTypeIds: string[] | null; // null = บัตรเข้างานทุกประเภท (ไม่รวม workshop)
+}
+
+export type SponsorTier = "platinum" | "gold" | "silver" | "exhibitor";
+
+export interface Sponsor {
+  id: string;
+  eventId: string;
+  name: string;
+  tier: SponsorTier;
+  description: I18n;
+  websiteUrl: string;
+  contactEmail: string;
+}
+
+export interface Booth {
+  id: string;
+  eventId: string;
+  sponsorId: string;
+  code: string; // เช่น B01
+  qrSlug: string; // QR บูธ = /b/<qrSlug>
+  zone: string;
+}
+
 export interface Catalog {
   event: EventInfo;
   slots: TimeSlot[];
   ticketTypes: TicketType[];
   products: Product[];
   promoCodes: PromoCode[];
+  checkpoints: Checkpoint[];
+  sponsors: Sponsor[];
+  booths: Booth[];
 }
 
 export type OrderLineInput =
@@ -217,6 +252,70 @@ export interface Attendee {
   jobTitle: string | null;
   shareWithSponsors: boolean;
   status: "registered" | "cancelled" | "refunded";
+  createdAt: string;
+  rfidUid: string | null; // สายรัดข้อมือ RFID ที่ผูกตอนเช็คอิน
+  firstCheckedInAt: string | null;
+}
+
+export type CheckinResult =
+  | "accepted"
+  | "already_in"
+  | "wrong_checkpoint"
+  | "wrong_day"
+  | "entry_check_failed"
+  | "cancelled"
+  | "invalid_qr"
+  | "unknown";
+
+// ทุกการสแกนที่หน้างาน (รวมที่ไม่ผ่าน) — id สร้างจากเครื่องสแกน ส่งซ้ำกี่ครั้งก็บันทึกครั้งเดียว
+export interface Checkin {
+  id: string;
+  eventId: string;
+  attendeeId: string | null;
+  checkpointId: string;
+  operatingDate: string; // วันที่หน้างาน YYYY-MM-DD
+  deviceName: string;
+  result: CheckinResult;
+  rawCode: string | null;
+  scannedAt: string;
+  receivedAt: string;
+  offline: boolean;
+}
+
+export type InterestLevel = "visit" | "interested" | "request_info";
+export type LeadRating = "hot" | "warm" | "cold";
+
+export interface BoothScan {
+  id: string;
+  eventId: string;
+  boothId: string;
+  attendeeId: string;
+  source: "attendee_scanned_booth" | "staff_scanned_badge";
+  action: InterestLevel;
+  deviceName: string | null;
+  scannedAt: string;
+}
+
+// 1 แถวต่อ (บูธ, ผู้เข้างาน) — sponsor เห็นตัวบุคคลเฉพาะคนที่ยินยอม
+export interface Lead {
+  id: string;
+  eventId: string;
+  sponsorId: string;
+  boothId: string;
+  attendeeId: string;
+  firstScannedAt: string;
+  lastScannedAt: string;
+  scanCount: number;
+  interestLevel: InterestLevel;
+  rating: LeadRating | null;
+  notes: string;
+}
+
+export interface LeadExport {
+  id: string;
+  sponsorId: string;
+  exportedBy: string;
+  attendeeIds: string[];
   createdAt: string;
 }
 

@@ -7,3 +7,6 @@ export * from "./ticketing";
 export * from "./payments/provider";
 export * from "./payments/mock";
 export { createMockCatalog } from "./mock-data";
+export * from "./checkin-rules";
+export * from "./onsite";
+export { seedDemo } from "./seed";

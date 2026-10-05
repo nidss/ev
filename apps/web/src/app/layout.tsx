@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LangSwitch } from "@/components/lang-switch";
 import { getLocale } from "@/lib/server";
 import "./globals.css";
@@ -15,7 +16,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen font-sans antialiased">
         <header className="border-b border-line bg-surface">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <span className="text-sm font-bold tracking-wide text-brand">EV · Tickets</span>
+            <Link href="/" className="text-sm font-bold tracking-wide text-brand">
+              EV · Tickets
+            </Link>
             <LangSwitch locale={locale} />
           </div>
         </header>

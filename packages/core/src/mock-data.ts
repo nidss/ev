@@ -1,6 +1,6 @@
 // ข้อมูลตัวอย่าง (mock) ของงาน 1 งาน — มีทั้งบัตรฟรี บัตรเสียเงิน workshop และ add-on
 // ยังไม่มีผังที่นั่ง: ความจุนับเป็นจำนวนต่อรอบ / ต่อประเภทบัตรเท่านั้น
-import type { Catalog, EventInfo, Product, PromoCode, TicketType, TimeSlot } from "./types";
+import type { Booth, Catalog, Checkpoint, EventInfo, Product, PromoCode, Sponsor, TicketType, TimeSlot } from "./types";
 
 const EVENT_ID = "evt_bet26";
 const baht = (n: number) => n * 100;
@@ -412,7 +412,75 @@ const promoCodes: PromoCode[] = [
   },
 ];
 
+const checkpoints: Checkpoint[] = [
+  {
+    id: "cp_gate_a",
+    eventId: EVENT_ID,
+    name: { th: "ประตู A (ทางเข้าหลัก)", en: "Gate A (main entrance)" },
+    kind: "entrance",
+    allowedTicketTypeIds: null,
+  },
+  {
+    id: "cp_gate_b",
+    eventId: EVENT_ID,
+    name: { th: "ประตู B", en: "Gate B" },
+    kind: "entrance",
+    allowedTicketTypeIds: null,
+  },
+  {
+    id: "cp_vip",
+    eventId: EVENT_ID,
+    name: { th: "VIP Lounge", en: "VIP Lounge" },
+    kind: "vip_area",
+    allowedTicketTypeIds: ["tt_vip", "tt_press"],
+  },
+  {
+    id: "cp_room_w1",
+    eventId: EVENT_ID,
+    name: { th: "ห้อง Workshop W1", en: "Workshop room W1" },
+    kind: "workshop",
+    allowedTicketTypeIds: ["tt_ws_ai", "tt_ws_fin"],
+  },
+  {
+    id: "cp_room_w2",
+    eventId: EVENT_ID,
+    name: { th: "ห้อง Workshop W2", en: "Workshop room W2" },
+    kind: "workshop",
+    allowedTicketTypeIds: ["tt_ws_line", "tt_ws_content"],
+  },
+];
+
+// สปอนเซอร์และบูธ — ชื่อบริษัททั้งหมดเป็นชื่อสมมติ
+const sponsorDefs: [string, Sponsor["tier"], string, string][] = [
+  ["Bluewave Pay", "platinum", "ระบบรับชำระเงินและ PromptPay สำหรับงานอีเว้นท์", "Payments and PromptPay for events"],
+  ["Nimbus Cloud", "gold", "คลาวด์และ AI สำหรับวิเคราะห์ข้อมูลผู้เข้างาน", "Cloud and AI for attendee analytics"],
+  ["Northstar Logistics", "gold", "ขนส่งบูธและอุปกรณ์งานแสดงสินค้า", "Booth and exhibition logistics"],
+  ["Lotus Insure", "silver", "ประกันภัยงานอีเว้นท์และผู้เข้างาน", "Event and attendee insurance"],
+  ["Orbit Stage", "silver", "แสง เสียง และเวทีครบวงจร", "Lighting, sound and staging"],
+  ["Pixel Factory", "exhibitor", "เอเจนซี่การตลาดดิจิทัลและไลฟ์สตรีม", "Digital marketing and live streaming agency"],
+];
+
+const sponsors: Sponsor[] = sponsorDefs.map(([name, tier, th, en], i) => ({
+  id: `sp_${i + 1}`,
+  eventId: EVENT_ID,
+  name,
+  tier,
+  description: { th, en },
+  websiteUrl: `https://example.com/${name.split(" ")[0]!.toLowerCase()}`,
+  contactEmail: `leads@${name.split(" ")[0]!.toLowerCase()}.example.com`,
+}));
+
+const booths: Booth[] = sponsors.map((sp, i) => ({
+  id: `bo_${i + 1}`,
+  eventId: EVENT_ID,
+  sponsorId: sp.id,
+  code: `B${String(i + 1).padStart(2, "0")}`,
+  // slug ยาวสุ่ม เพื่อไม่ให้เดา URL บูธอื่นได้ (ค่าตายตัวใน mock)
+  qrSlug: ["k7q2mx9a", "p3w8zr1d", "h5n4tb6c", "v9e2yk3s", "m1x7qd8f", "r6c3ju2w"][i]!,
+  zone: i < 2 ? "A" : i < 4 ? "B" : "C",
+}));
+
 export function createMockCatalog(): Catalog {
   // คืนสำเนาใหม่ทุกครั้ง เพื่อไม่ให้ test แต่ละตัวแก้ข้อมูลกันเอง
-  return structuredClone({ event, slots, ticketTypes, products, promoCodes });
+  return structuredClone({ event, slots, ticketTypes, products, promoCodes, checkpoints, sponsors, booths });
 }
