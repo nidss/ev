@@ -23,6 +23,7 @@ export interface EventInfo {
   venueAddress: I18n;
   organizerName: string;
   coverGradient: [string, string];
+  coverImageUrl: string | null; // path ภายในเว็บ เช่น /events/bet26-cover.webp (null = ใช้ gradient)
   capacity: number | null;
   holdMinutes: number;
   feeMode: FeeMode;

@@ -6,6 +6,7 @@ import { useBackend } from "@/lib/backend";
 import { baht, dateRange, dayLabel, timeRange, tr } from "@/lib/format";
 import { dict } from "@/lib/i18n";
 import { useLocale } from "@/lib/locale";
+import { BASE_PATH } from "@/lib/paths";
 import { TicketSelector, type WizardProduct, type WizardRound, type WizardTicket } from "./ticket-selector";
 
 // หน้างาน: ข้อมูลงาน + เลือกบัตรได้ทันทีในหน้าเดียว (แนว Zipevent) + รายละเอียด / เงื่อนไข / ราคาบัตร
@@ -70,12 +71,30 @@ export function EventView({ slug }: { slug: string }) {
     <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
       <section className="grid gap-6 md:grid-cols-[minmax(0,320px)_1fr]">
         <div
-          className="flex aspect-[16/9] flex-col justify-end rounded-2xl p-6 text-white shadow-sm md:aspect-[3/4]"
+          className="relative flex aspect-[16/9] flex-col justify-end overflow-hidden rounded-2xl p-6 text-white shadow-sm md:aspect-[3/4]"
           style={{ background: `linear-gradient(160deg, ${event.coverGradient[0]}, ${event.coverGradient[1]})` }}
         >
-          <p className="text-xs font-semibold tracking-widest opacity-80">{event.shortCode}</p>
-          <p className="mt-2 text-2xl font-bold leading-tight">{tr(event.name, locale)}</p>
-          <p className="mt-2 text-sm opacity-80">{dateRange(event.startsAt, event.endsAt, locale)}</p>
+          {event.coverImageUrl && (
+            <>
+              {/* static export ไม่มี image optimizer — ใช้ img ธรรมดาและใส่ basePath เอง */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${BASE_PATH}${event.coverImageUrl}`}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover object-[60%_center]"
+              />
+              {/* ไล่สีเข้มด้านล่างให้อ่านตัวอักษรบนรูปได้ */}
+              <div
+                className="absolute inset-0"
+                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.3) 55%, rgba(0,0,0,0) 85%)" }}
+              />
+            </>
+          )}
+          <div className="relative">
+            <p className="text-xs font-semibold tracking-widest opacity-80">{event.shortCode}</p>
+            <p className="mt-2 text-2xl font-bold leading-tight [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]">{tr(event.name, locale)}</p>
+            <p className="mt-2 text-sm opacity-90">{dateRange(event.startsAt, event.endsAt, locale)}</p>
+          </div>
         </div>
 
         <div className="card p-6">

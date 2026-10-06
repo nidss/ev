@@ -38,6 +38,7 @@ const event: EventInfo = {
   },
   organizerName: "EV Demo Organizer Co., Ltd.",
   coverGradient: ["#0f766e", "#1e3a8a"],
+  coverImageUrl: "/events/bet26-cover.webp",
   capacity: 8000,
   holdMinutes: 15,
   feeMode: "absorb",
