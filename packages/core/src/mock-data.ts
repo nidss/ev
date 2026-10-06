@@ -75,12 +75,12 @@ const termsDocument: TermsDocument = {
       heading: { th: "4. การแชร์ข้อมูลกับสปอนเซอร์ที่บูธ", en: "4. Sharing data with sponsors at booths" },
       paragraphs: [
         {
-          th: "ภายในงาน ระหว่างเยี่ยมชมบูธ ท่านอาจถูกขอให้สแกน QR Code บนบัตร/ป้ายชื่อ หรือแตะสายรัดข้อมือ และท่านสามารถสแกน QR Code ของบูธเพื่อกด \"สนใจ\" หรือ \"ขอข้อมูลเพิ่ม\" ได้ ท่านมีสิทธิ์เลือกว่าจะให้สแกนหรือไม่",
+          th: "ภายในงาน ระหว่างเยี่ยมชมบูธ ท่านอาจถูกขอให้สแกน QR Code บนบัตร/ป้ายชื่อ หรือแตะสายรัดข้อมือ และท่านสามารถสแกน QR Code ของบูธเพื่อกด \"สนใจ\" หรือ \"ขอข้อมูลเพิ่ม\" ได้ ท่านสามารถเลือกได้ว่าจะให้เจ้าหน้าที่หรือผู้ออกบูธสแกนหรือไม่",
           en: "At booths you may be asked to have your ticket/badge QR code scanned or tap your wristband, and you may scan a booth's QR code to tap \"Interested\" or \"Request info\". Whether to be scanned is your choice.",
         },
         {
-          th: "ข้อมูลของท่าน (ชื่อ อีเมล บริษัท ตำแหน่ง และความสนใจที่ท่านแสดงที่บูธ) จะถูกส่งให้เฉพาะสปอนเซอร์ของบูธที่ท่านถูกสแกนหรือสแกนเท่านั้น และเฉพาะกรณีที่ท่านเลือก \"ยินยอมให้ส่งข้อมูลให้ sponsor\" ในขั้นกรอกข้อมูล หากไม่ได้ยินยอม สปอนเซอร์จะเห็นเพียงจำนวนผู้เข้าชมบูธ โดยไม่เห็นข้อมูลที่ระบุตัวท่าน",
-          en: "Your details (name, email, company, job title and the interest you showed at the booth) are shared only with the sponsor of a booth where you were scanned or which you scanned, and only if you ticked \"share my details with sponsors\" when registering. Otherwise the sponsor sees only a visitor count, not who you are.",
+          th: "การยอมรับเงื่อนไขนี้ถือว่าท่านยินยอมให้ส่งข้อมูลของท่าน (ชื่อ อีเมล บริษัท ตำแหน่ง และความสนใจที่ท่านแสดงที่บูธ) ให้แก่สปอนเซอร์ของบูธที่ท่านให้สแกนหรือที่ท่านสแกนเท่านั้น เพื่อให้สปอนเซอร์ติดต่อกลับเกี่ยวกับสินค้าหรือบริการที่ท่านสนใจ บูธที่ท่านไม่ได้สแกนจะไม่ได้รับข้อมูลของท่าน",
+          en: "By accepting these terms you consent to your details (name, email, company, job title and the interest you showed at the booth) being shared only with the sponsor of a booth where you were scanned or which you scanned, so they can follow up about products or services you showed interest in. Booths you did not scan do not receive your data.",
         },
         {
           th: "เมื่อข้อมูลถูกส่งให้สปอนเซอร์แล้ว ข้อมูลนั้นจะอยู่ภายใต้นโยบายความเป็นส่วนตัวของสปอนเซอร์รายนั้น ผู้จัดงานบันทึกประวัติการส่งต่อข้อมูลทุกครั้ง แต่ไม่รับผิดชอบต่อการที่สปอนเซอร์นำข้อมูลของท่านไปใช้",

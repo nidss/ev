@@ -293,6 +293,21 @@ describe("checkout", () => {
     expect(view.attendees.filter((a) => a.shareWithSponsors).map((a) => a.email)).toEqual([buyer.email]);
   });
 
+  it("treats accepting the terms as sponsor consent for the buyer's own ticket only", async () => {
+    const { svc } = setup();
+    const { order, accessToken } = svc.createOrder(SLUG, {
+      acceptTerms: true,
+      lines: [{ kind: "ticket", ticketTypeId: "tt_expo", slotId: "slot_day1", quantity: 2 }],
+    });
+    const holders = holdersFor(order);
+    holders[0]!.email = buyer.email;
+    // ไม่ส่ง shareWithSponsors → ใช้ค่าจากการยอมรับเงื่อนไข (true)
+    await svc.submitCheckout(order.id, accessToken, { buyer, holders, consents: { organizerMarketing: false } });
+    const shared = svc.getOrder(order.id, accessToken).attendees.map((a) => [a.email, a.shareWithSponsors]);
+    expect(shared).toContainEqual([buyer.email, true]);
+    expect(shared.filter(([, s]) => s)).toHaveLength(1);
+  });
+
   it("rejects the same person registering twice for a one-per-person free ticket", async () => {
     const { svc } = setup();
     const first = svc.createOrder(SLUG, {

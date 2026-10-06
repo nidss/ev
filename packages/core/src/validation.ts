@@ -48,7 +48,9 @@ export const checkoutSchema = z.object({
   holders: z.array(holderSchema).max(100),
   promoCode: z.string().trim().max(40).nullish(),
   consents: z.object({
-    shareWithSponsors: z.boolean(),
+    // การยอมรับเงื่อนไขการซื้อบัตร (ข้อ 4) รวมความยินยอมส่งข้อมูลให้ sponsor ของบูธที่สแกนแล้ว
+    // จึงไม่มี checkbox แยกในหน้ากรอกข้อมูล — ค่าเริ่มต้นเป็น true (เก็บ field ไว้รองรับการถอนความยินยอม/นำเข้าข้อมูล)
+    shareWithSponsors: z.boolean().default(true),
     organizerMarketing: z.boolean(),
   }),
   taxInvoice: z
