@@ -4,7 +4,7 @@
 export type Locale = "th" | "en";
 export type I18n = Record<Locale, string>;
 
-export type TicketKind = "general" | "conference" | "vip" | "press" | "workshop";
+export type TicketKind = "general" | "trade" | "conference" | "vip" | "press" | "workshop";
 export type HolderInfo = "buyer_only" | "name_only" | "full";
 export type FeeMode = "absorb" | "pass_on";
 export type PaymentMethod = "card" | "promptpay" | "mobile_banking";
@@ -12,7 +12,7 @@ export type PaymentMethod = "card" | "promptpay" | "mobile_banking";
 export interface EventInfo {
   id: string;
   slug: string;
-  shortCode: string; // ใช้ใน QR เช่น BET26
+  shortCode: string; // ใช้ใน QR เช่น MOC26
   name: I18n;
   tagline: I18n;
   description: I18n;
@@ -23,7 +23,7 @@ export interface EventInfo {
   venueAddress: I18n;
   organizerName: string;
   coverGradient: [string, string];
-  coverImageUrl: string | null; // path ภายในเว็บ เช่น /events/bet26-cover.webp (null = ใช้ gradient)
+  coverImageUrl: string | null; // path ภายในเว็บ เช่น /events/moc26-cover.webp (null = ใช้ gradient)
   capacity: number | null;
   holdMinutes: number;
   feeMode: FeeMode;
@@ -109,7 +109,7 @@ export interface PromoCode {
   validTo: string | null;
 }
 
-export type CheckpointKind = "entrance" | "workshop" | "vip_area";
+export type CheckpointKind = "entrance" | "workshop" | "vip_area" | "restricted_area";
 
 // จุดเช็คอิน เช่น ประตูหลัก, ห้อง workshop, VIP lounge
 export interface Checkpoint {
@@ -139,6 +139,44 @@ export interface Booth {
   code: string; // เช่น B01
   qrSlug: string; // QR บูธ = /b/<qrSlug>
   zone: string;
+  categoryId: string | null; // หมวดสินค้า (กำหนดสีบนผังงาน)
+}
+
+// หมวดสินค้า — สีใช้ระบายโซนบนผังงาน (ผ่าน validate_palette ทั้งโหมดสว่าง/มืด)
+// สีไม่ได้สื่อความหมายเพียงอย่างเดียว: ทุกโซนมีตัวอักษรหมวด + ชื่อกำกับ และรหัสบูธขึ้นต้นด้วยตัวอักษรเดียวกัน
+export interface ProductCategory {
+  id: string;
+  code: string; // ตัวอักษรหมวด เช่น A
+  name: I18n;
+  shortName: I18n; // ป้ายสั้นบนผัง (ชื่อเต็มอยู่ในคำอธิบายสัญลักษณ์)
+  color: string; // บนพื้นสว่าง (รวมถึงงานพิมพ์)
+  colorDark: string; // บนพื้นมืด
+}
+
+// พิกัดเป็นหน่วยของผัง (ไม่ใช่เมตร) — มุมซ้ายบน = (0, 0)
+export interface FloorZone {
+  id: string;
+  label: I18n;
+  categoryId: string | null; // null = พื้นที่ส่วนกลาง เช่น เวที จุดลงทะเบียน
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface FloorMarker {
+  id: string;
+  label: I18n;
+  x: number;
+  y: number;
+}
+
+export interface FloorPlan {
+  title: I18n;
+  width: number;
+  height: number;
+  zones: FloorZone[];
+  entrances: FloorMarker[];
 }
 
 export interface Catalog {
@@ -150,6 +188,8 @@ export interface Catalog {
   checkpoints: Checkpoint[];
   sponsors: Sponsor[];
   booths: Booth[];
+  categories: ProductCategory[];
+  floorPlan: FloorPlan | null;
 }
 
 export type OrderLineInput =

@@ -7,6 +7,7 @@ import { Loading } from "@/components/loading";
 import { NotFoundBox } from "@/components/not-found-box";
 import { useBackend } from "@/lib/backend";
 import { tr } from "@/lib/format";
+import { isFreeEvent } from "@/lib/i18n";
 import { useLocale } from "@/lib/locale";
 import { CheckoutForm, type CheckoutItem } from "./checkout-form";
 
@@ -58,6 +59,7 @@ export function CheckoutView({ slug }: { slug: string }) {
       <CheckoutForm
         locale={locale}
         slug={slug}
+        eventFree={isFreeEvent(catalog)}
         orderId={order.id}
         orderCode={order.orderCode}
         token={token}

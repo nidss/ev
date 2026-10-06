@@ -1,9 +1,9 @@
 import type { Locale } from "@ev/core";
 import { dict } from "@/lib/i18n";
 
-// แถบขั้นตอนการซื้อบัตร: 1 เลือกบัตร (หน้างาน) · 2 กรอกข้อมูล · 3 ชำระเงิน
-export function Steps({ locale, current }: { locale: Locale; current: 1 | 2 | 3 }) {
-  const labels = dict(locale).steps;
+// แถบขั้นตอน: 1 เลือกบัตร (หน้างาน) · 2 กรอกข้อมูล · 3 ชำระเงิน (งานฟรี: เลือกประเภท · กรอกข้อมูล · รับป้ายชื่อ)
+export function Steps({ locale, current, free = false }: { locale: Locale; current: 1 | 2 | 3; free?: boolean }) {
+  const labels = dict(locale, free).steps;
   return (
     <ol className="flex items-center gap-1 overflow-x-auto pb-1 text-xs sm:gap-2 sm:text-sm">
       {labels.map((label, i) => {

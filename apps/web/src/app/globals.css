@@ -51,6 +51,73 @@ body {
   color: var(--text);
 }
 
+/* ผังงาน: สีโซนตามหมวดสินค้า — โหมดมืดใช้สีที่ปรับไว้สำหรับพื้นมืด ยกเว้นป้ายชื่อ (พิมพ์ลงกระดาษขาว) */
+.fp {
+  --fp-ink: #0f172a;
+  --fp-muted: #475569;
+  --fp-cell: #ffffff;
+  --fp-shared: #eef2f6;
+  --fp-shared-line: #94a3b8;
+}
+.fp-cat {
+  --zc: var(--c);
+  --zt: var(--t);
+}
+@media (prefers-color-scheme: dark) {
+  .fp-auto {
+    --fp-ink: #e5e7eb;
+    --fp-muted: #94a3b8;
+    --fp-cell: #111827;
+    --fp-shared: #1f2937;
+    --fp-shared-line: #475569;
+  }
+  .fp-auto .fp-cat {
+    --zc: var(--cd);
+    --zt: var(--td);
+  }
+}
+
+/* ป้ายชื่อเป็นการ์ดสีขาวเสมอ (เหมือนของจริงที่พิมพ์ออกมา) แม้เครื่องจะอยู่โหมดมืด */
+.badge-light {
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #475569;
+  --border: #cbd5e1;
+  --brand: #0f766e;
+  --brand-ink: #ffffff;
+  --brand-soft: #e7f1f0;
+  background: #ffffff;
+  color: #0f172a;
+}
+.badge-face {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 5 / 7;
+}
+
+@media print {
+  @page {
+    size: 100mm 140mm;
+    margin: 0;
+  }
+  body {
+    background: #ffffff;
+  }
+  .badge-face {
+    width: 100mm;
+    max-width: none;
+    height: 140mm;
+    margin: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    /* ขึ้นหน้าใหม่ก่อนทุกด้าน (ด้านแรกของเอกสารไม่ทำให้เกิดหน้าว่าง ต่างจาก break-after ที่ทิ้งหน้าว่างท้าย) */
+    break-before: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @layer components {
   .field {
     @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand-ring;

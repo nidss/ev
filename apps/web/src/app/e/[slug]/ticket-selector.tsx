@@ -50,10 +50,12 @@ const ALMOST_FULL = 10;
 const offerKey = (o: { ticketTypeId: string; slotId: string | null }) => `${o.ticketTypeId}|${o.slotId ?? ""}`;
 
 // เลือกบัตรบนหน้างาน (แบบ Zipevent): เลือกวัน → เลือกจำนวนบัตร / workshop / add-on → ยอมรับเงื่อนไข → ยืนยันบัตร
+// งานฟรีที่บัตรใช้ได้ทุกวัน: ไม่มีขั้นเลือกวัน เหลือแค่เลือกประเภทผู้เข้างานและจำนวนคน
 // วันที่เลือกเก็บใน URL (?round=YYYY-MM-DD) ให้ reload แล้วยังอยู่วันเดิม
 export function TicketSelector(props: {
   locale: Locale;
   slug: string;
+  free: boolean; // งานลงทะเบียนฟรี: ใช้คำว่าลงทะเบียน ไม่แสดงยอดเงิน
   holdMinutes: number;
   rounds: WizardRound[];
   tickets: Record<string, WizardTicket>;
@@ -64,8 +66,10 @@ export function TicketSelector(props: {
   onAgreedChange: (v: boolean) => void;
   onOpenTerms: () => void;
 }) {
-  const { locale, rounds, tickets, products } = props;
-  const t = dict(locale);
+  const { locale, rounds, tickets, products, free } = props;
+  const t = dict(locale, free);
+  // ทุกประเภทใช้ได้ทั้งงาน → ไม่ต้องให้เลือกวัน (ใช้รอบแรกที่เปิดอยู่เป็นฐานของรายการ)
+  const needsRound = Object.values(tickets).some((tk) => !tk.wholeEvent);
   const router = useRouter();
   const params = useSearchParams();
 
@@ -132,6 +136,7 @@ export function TicketSelector(props: {
   );
   const blocked = needsAdmission && !hasAdmission;
   const hasTicket = lines.some((l) => l.input.kind === "ticket");
+  const people = lines.reduce((a, l) => a + (l.input.kind === "ticket" ? l.quantity : 0), 0);
 
   async function confirm() {
     setBusy(true);
@@ -151,7 +156,7 @@ export function TicketSelector(props: {
       if (!res.ok) throw new Error(data?.error?.code);
       router.push(`/e/${props.slug}/checkout?order=${data.orderId}&token=${encodeURIComponent(data.token)}`);
     } catch (e) {
-      setError(errorText(locale, (e as Error).message));
+      setError(errorText(locale, (e as Error).message, free));
       setBusy(false);
     }
   }
@@ -223,10 +228,11 @@ export function TicketSelector(props: {
     <section id="tickets" className="scroll-mt-4 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 className="text-2xl font-bold">{t.tickets}</h2>
-        <Steps locale={locale} current={1} />
+        <Steps locale={locale} current={1} free={free} />
       </div>
 
       {/* เลือกวัน (รอบ) */}
+      {needsRound && (
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t.chooseRound}>
         {rounds.map((r) => {
           const open = r.status === "on_sale";
@@ -254,6 +260,7 @@ export function TicketSelector(props: {
           );
         })}
       </div>
+      )}
 
       {!round ? (
         <p className="card p-6 text-sm text-muted">{t.roundStatus.closed}</p>
@@ -289,6 +296,7 @@ export function TicketSelector(props: {
               </div>
             )}
 
+            {products.length > 0 && (
             <div>
               <h3 className="mb-3 text-lg font-bold">{t.addons}</h3>
               <div className="card divide-y divide-line">
@@ -314,15 +322,15 @@ export function TicketSelector(props: {
                   );
                 })}
               </div>
-              <p className="mt-3 text-xs text-muted">ⓘ {t.noSeatMap}</p>
             </div>
+            )}
           </div>
 
           {/* สรุป: sticky ด้านขวาบนจอใหญ่ / แถบล่างบนมือถือ */}
           <aside className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface p-4 shadow-lg lg:sticky lg:top-4 lg:self-start lg:rounded-2xl lg:border lg:shadow-none">
             <h3 className="hidden font-semibold lg:block">{t.summary}</h3>
             <p className="hidden text-xs text-muted lg:block">
-              {round.label} · {round.time}
+              {needsRound ? `${round.label} · ${round.time}` : t.wholeEvent}
             </p>
             <ul className="hidden space-y-2 py-3 text-sm lg:block">
               {lines.length === 0 && <li className="text-muted">{t.noneSelected}</li>}
@@ -338,7 +346,7 @@ export function TicketSelector(props: {
             <div className="flex items-center justify-between gap-4 lg:border-t lg:border-line lg:pt-3">
               <div>
                 <div className="text-xs text-muted">{t.total}</div>
-                <div className="text-xl font-bold">{baht(total, locale)}</div>
+                <div className="text-xl font-bold">{free ? t.registrants(people) : baht(total, locale)}</div>
               </div>
               <button className="btn-primary lg:hidden" disabled={!canConfirm} onClick={confirm}>
                 {busy ? t.processing : t.confirmTickets}
@@ -363,7 +371,7 @@ export function TicketSelector(props: {
             <button className="btn-primary mt-3 hidden w-full lg:flex" disabled={!canConfirm} onClick={confirm}>
               {busy ? t.processing : t.confirmTickets}
             </button>
-            <p className="mt-2 hidden text-xs text-muted lg:block">{t.holdNote(props.holdMinutes)}</p>
+            {!free && <p className="mt-2 hidden text-xs text-muted lg:block">{t.holdNote(props.holdMinutes)}</p>}
           </aside>
         </div>
       )}

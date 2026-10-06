@@ -2,11 +2,12 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { FloorPlan, FloorPlanLegend } from "@/components/floor-plan";
 import { Loading } from "@/components/loading";
 import { TermsModal } from "@/components/terms-modal";
 import { useBackend } from "@/lib/backend";
 import { baht, dateRange, dayLabel, timeRange, tr } from "@/lib/format";
-import { dict } from "@/lib/i18n";
+import { dict, isFreeEvent } from "@/lib/i18n";
 import { useLocale } from "@/lib/locale";
 import { BASE_PATH } from "@/lib/paths";
 import { TicketSelector, type WizardProduct, type WizardRound, type WizardTicket } from "./ticket-selector";
@@ -19,9 +20,10 @@ export function EventView({ slug }: { slug: string }) {
   const [agreed, setAgreed] = useState(false);
   const b = useBackend();
   if (!b) return <Loading />;
-  const t = dict(locale);
   const view = b.ticketing.getEventView(slug, { unlockCode: code });
   const { event, slots } = view.catalog;
+  const free = isFreeEvent(view.catalog);
+  const t = dict(locale, free);
 
   const prices = [...new Set(view.tickets.filter((x) => x.ticketType.isPublic).map((x) => x.ticketType.priceSatang))].sort(
     (a, b) => a - b,
@@ -113,9 +115,7 @@ export function EventView({ slug }: { slug: string }) {
               <span className="block text-muted">{tr(event.venueAddress, locale)}</span>
             </dd>
             <dt className="text-muted">{t.priceList}</dt>
-            <dd className="font-semibold">
-              {priceText} {t.baht}
-            </dd>
+            <dd className="font-semibold">{free ? t.freeEntry : `${priceText} ${t.baht}`}</dd>
             <dt className="text-muted">{t.organizer}</dt>
             <dd>{event.organizerName}</dd>
           </dl>
@@ -127,7 +127,11 @@ export function EventView({ slug }: { slug: string }) {
             ) : (
               <span className="btn-primary pointer-events-none px-10 opacity-40">{t.roundStatus.closed}</span>
             )}
-            <span className="text-xs text-muted">{t.noSeatMap}</span>
+            {view.catalog.floorPlan && (
+              <a href="#floor-plan" className="text-sm font-medium text-brand underline">
+                {t.floorPlanTitle}
+              </a>
+            )}
           </div>
         </div>
       </section>
@@ -135,6 +139,7 @@ export function EventView({ slug }: { slug: string }) {
       <TicketSelector
         locale={locale}
         slug={slug}
+        free={free}
         holdMinutes={event.holdMinutes}
         rounds={rounds}
         tickets={tickets}
@@ -153,12 +158,22 @@ export function EventView({ slug }: { slug: string }) {
         onAccept={() => setAgreed(true)}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className={`grid gap-6 ${free ? "" : "lg:grid-cols-[1fr_380px]"}`}>
         <div className="space-y-6">
           <section className="card p-6">
             <h2 className="text-lg font-semibold">{t.about}</h2>
             <p className="mt-3 leading-relaxed text-muted">{tr(event.description, locale)}</p>
           </section>
+          {view.catalog.floorPlan && (
+            <section id="floor-plan" className="card scroll-mt-4 p-6">
+              <h2 className="text-lg font-semibold">{t.floorPlanTitle}</h2>
+              <p className="mt-1 text-sm text-muted">{t.floorPlanNote}</p>
+              <FloorPlan catalog={view.catalog} locale={locale} className="mt-4 max-w-3xl" />
+              <div className="mt-5">
+                <FloorPlanLegend catalog={view.catalog} locale={locale} showExhibitors />
+              </div>
+            </section>
+          )}
           <section id="terms" className="card scroll-mt-4 p-6">
             <h2 className="text-lg font-semibold">{t.termsTitle}</h2>
             <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted">
@@ -166,10 +181,14 @@ export function EventView({ slug }: { slug: string }) {
                 <li key={i}>{tr(term, locale)}</li>
               ))}
               <li>{t.limitTerm}</li>
-              <li>{t.holdTerm(event.holdMinutes)}</li>
+              {!free && <li>{t.holdTerm(event.holdMinutes)}</li>}
             </ol>
-            <h3 className="mt-5 text-sm font-semibold">{t.refundPolicy}</h3>
-            <p className="mt-1 text-sm text-muted">{tr(event.refundPolicy, locale)}</p>
+            {!free && (
+              <>
+                <h3 className="mt-5 text-sm font-semibold">{t.refundPolicy}</h3>
+                <p className="mt-1 text-sm text-muted">{tr(event.refundPolicy, locale)}</p>
+              </>
+            )}
             <button
               type="button"
               className="mt-4 rounded-xl border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand-softer"
@@ -179,6 +198,7 @@ export function EventView({ slug }: { slug: string }) {
             </button>
           </section>
         </div>
+        {!free && (
         <section className="card h-fit p-6">
           <h2 className="font-semibold">{t.priceList}</h2>
           <ul className="mt-3 divide-y divide-line text-sm">
@@ -194,6 +214,7 @@ export function EventView({ slug }: { slug: string }) {
               ))}
           </ul>
         </section>
+        )}
       </div>
     </main>
   );

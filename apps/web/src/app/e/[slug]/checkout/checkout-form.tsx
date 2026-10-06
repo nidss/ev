@@ -41,6 +41,7 @@ const COUNTRIES = ["TH", "CN", "JP", "KR", "SG", "MY", "ID", "VN", "PH", "LA", "
 export function CheckoutForm(props: {
   locale: Locale;
   slug: string;
+  eventFree: boolean; // งานลงทะเบียนฟรี: ไม่มีโค้ดส่วนลด / ยอดเงิน / ช่องทางชำระ
   orderId: string;
   orderCode: string;
   token: string;
@@ -53,8 +54,8 @@ export function CheckoutForm(props: {
   initialHolders: Holder[];
   initialPromo: { code: string; label: string } | null;
 }) {
-  const { locale, items } = props;
-  const t = dict(locale);
+  const { locale, items, eventFree } = props;
+  const t = dict(locale, eventFree);
   const router = useRouter();
 
   const [secondsLeft, setSecondsLeft] = useState(props.holdSecondsLeft);
@@ -108,7 +109,7 @@ export function CheckoutForm(props: {
 
   const [wantTax, setWantTax] = useState(false);
   const [tax, setTax] = useState({ name: "", taxId: "", branch: "", address: "" });
-  // การส่งข้อมูลให้ sponsor อยู่ในเงื่อนไขที่ยอมรับตอนเลือกบัตรแล้ว — หน้านี้เหลือแค่การรับข่าวสาร
+  // การส่งข้อมูลให้ผู้ออกบูธอยู่ในเงื่อนไขที่ยอมรับตอนเลือกบัตรแล้ว — หน้านี้เหลือแค่การรับข่าวสาร
   const [consents, setConsents] = useState({ organizerMarketing: false });
   // ขั้น 4 กรอกข้อมูล → ขั้น 5 ตรวจสอบและชำระเงิน (อยู่หน้าเดียวกัน ข้อมูลไม่หายเมื่อย้อนกลับ)
   const [phase, setPhase] = useState<"info" | "review">("info");
@@ -128,7 +129,7 @@ export function CheckoutForm(props: {
     });
     const data = await res.json();
     if (!res.ok) {
-      setPromoError(errorText(locale, data?.error?.code));
+      setPromoError(errorText(locale, data?.error?.code, eventFree));
       return;
     }
     setTotals(data);
@@ -168,7 +169,7 @@ export function CheckoutForm(props: {
       if (data.status === "redirect") router.push(data.redirectUrl);
       else router.push(`/t?order=${props.orderId}&token=${encodeURIComponent(props.token)}`);
     } catch (err) {
-      setError(errorText(locale, (err as Error).message));
+      setError(errorText(locale, (err as Error).message, eventFree));
       setBusy(false);
     }
   }
@@ -205,7 +206,7 @@ export function CheckoutForm(props: {
 
   return (
     <form onSubmit={onSubmit} className="mt-2 space-y-6">
-      <Steps locale={locale} current={phase === "info" ? 2 : 3} />
+      <Steps locale={locale} current={phase === "info" ? 2 : 3} free={eventFree} />
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -411,7 +412,11 @@ export function CheckoutForm(props: {
             ))}
           </ul>
 
-          {phase === "review" && (
+          {phase === "review" && eventFree && props.unlockCode && (
+            <p className="mt-3 text-xs text-muted">🔓 {t.codeUnlocked(props.unlockCode)}</p>
+          )}
+
+          {phase === "review" && !eventFree && (
             <div className="mt-4 border-t border-line pt-4">
               <label className="label" htmlFor="promo">
                 {t.promo}
@@ -453,6 +458,7 @@ export function CheckoutForm(props: {
             </div>
           )}
 
+          {!eventFree && (
           <dl className="mt-4 space-y-1 border-t border-line pt-4 text-sm">
             <Row label={t.subtotal} value={baht(totals.subtotalSatang, locale)} />
             {totals.discountSatang > 0 && <Row label={t.discount} value={`−${baht(totals.discountSatang, locale)}`} />}
@@ -463,6 +469,7 @@ export function CheckoutForm(props: {
             </div>
             {totals.vatSatang > 0 && <p className="text-xs text-muted">{t.vatIncluded(baht(totals.vatSatang, locale))}</p>}
           </dl>
+          )}
 
           {error && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
           <button className="btn-primary mt-4 w-full" disabled={busy}>

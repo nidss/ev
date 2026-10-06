@@ -1,5 +1,5 @@
 // ข้อความบนหน้าจอ (TH/EN) — ข้อมูลของงาน/บัตรเป็น i18n อยู่ใน mock data แล้ว
-import type { Locale } from "@ev/core";
+import type { Catalog, Locale } from "@ev/core";
 
 const th = {
   steps: ["เลือกบัตร", "กรอกข้อมูล", "ชำระเงิน"],
@@ -50,7 +50,7 @@ const th = {
   soldOut: "เต็มแล้ว",
   notStarted: "ยังไม่เปิดขาย",
   ended: "ปิดขายแล้ว",
-  wholeEvent: "ใช้ได้ทั้ง 2 วัน",
+  wholeEvent: "ใช้ได้ทุกวันของงาน",
   chooseDay: "เลือกวัน",
   needsAdmission: "ต้องซื้อคู่กับบัตรเข้างาน",
   haveCode: "มีโค้ดจากผู้จัด?",
@@ -66,6 +66,22 @@ const th = {
   holdNote: (m: number) => `ระบบจะกันที่นั่งไว้ให้ ${m} นาทีระหว่างกรอกข้อมูลและชำระเงิน`,
   workshopNeedsAdmission: "Workshop และ add-on ต้องซื้อพร้อมบัตรเข้างานอย่างน้อย 1 ใบ",
   noSeatMap: "งานนี้ไม่มีผังที่นั่ง — นั่งได้ตามลำดับการเข้างาน",
+  freeEntry: "เข้าชมฟรี (ลงทะเบียนล่วงหน้า)",
+  registrants: (n: number) => `${n} คน`,
+  floorPlanTitle: "ผังงานและหมวดสินค้า",
+  floorPlanNote: "สีของแต่ละโซนแบ่งตามหมวดสินค้า รหัสบูธขึ้นต้นด้วยตัวอักษรของหมวด (เช่น A01 อยู่โซน A)",
+  floorPlanAria: (n: number) => `ผังงาน ${n} โซน แบ่งสีตามหมวดสินค้า`,
+  boothsInZone: "บูธ",
+  // ป้ายชื่อ
+  badgeTitle: "ป้ายชื่อของคุณ",
+  badgeFront: "ด้านหน้า",
+  badgeBack: "ด้านหลัง",
+  badgePrint: "พิมพ์ป้ายชื่อ",
+  badgePrintNote: "พิมพ์แบบ 2 หน้า (ด้านหน้า = ชื่อและ QR, ด้านหลัง = ผังงาน) ขนาด 10 × 14 ซม. หรือแสดง QR จากโทรศัพท์ก็ได้",
+  badgeShowQr: "แสดง QR นี้ที่จุดเช็คอิน",
+  badgeBackHint: "สแกน QR ที่บูธเพื่อรับข้อมูลสินค้า",
+  // แถบประเภทบนป้ายชื่อใช้คำอังกฤษตัวใหญ่ทั้งสองภาษา (ชื่อประเภทภาษาไทยอยู่บรรทัดล่าง)
+  typeLabel: { general: "VISITOR", trade: "TRADE", press: "PRESS" } as Record<string, string>,
   // checkout
   checkout: "กรอกข้อมูลและชำระเงิน",
   timeLeft: "เหลือเวลา",
@@ -200,7 +216,7 @@ const en: Dict = {
   soldOut: "Sold out",
   notStarted: "Not on sale yet",
   ended: "Sales ended",
-  wholeEvent: "Valid both days",
+  wholeEvent: "Valid every day",
   chooseDay: "Choose day",
   needsAdmission: "Requires an admission ticket",
   haveCode: "Have an organizer code?",
@@ -216,6 +232,20 @@ const en: Dict = {
   holdNote: (m) => `Your seats are held for ${m} minutes while you check out.`,
   workshopNeedsAdmission: "Workshops and add-ons must be bought with at least one admission ticket.",
   noSeatMap: "No seat map for this event: seating is first come, first served.",
+  freeEntry: "Free entry (pre-registration)",
+  registrants: (n) => `${n} ${n === 1 ? "person" : "people"}`,
+  floorPlanTitle: "Floor plan & product categories",
+  floorPlanNote: "Zones are coloured by product category. Booth codes start with the zone letter (e.g. A01 is in zone A).",
+  floorPlanAria: (n) => `Floor plan with ${n} zones coloured by product category`,
+  boothsInZone: "Booths",
+  badgeTitle: "Your name badge",
+  badgeFront: "Front",
+  badgeBack: "Back",
+  badgePrint: "Print badge",
+  badgePrintNote: "Print double-sided (front = name and QR, back = floor plan) at 10 × 14 cm, or just show the QR on your phone.",
+  badgeShowQr: "Show this QR at check-in",
+  badgeBackHint: "Scan booth QR codes to get product info",
+  typeLabel: { general: "VISITOR", trade: "TRADE", press: "PRESS" },
   checkout: "Details & payment",
   timeLeft: "Time left",
   expiredTitle: "Your hold has expired",
@@ -297,11 +327,86 @@ const en: Dict = {
 
 export const dicts: Record<Locale, Dict> = { th, en };
 
-export function dict(locale: Locale): Dict {
-  return dicts[locale];
+// งานที่ลงทะเบียนฟรีทั้งหมด ใช้คำว่า "ลงทะเบียน" แทน "ซื้อบัตร" และไม่มีขั้นชำระเงิน
+const freeOverrides: Record<Locale, Partial<Dict>> = {
+  th: {
+    steps: ["เลือกประเภท", "กรอกข้อมูล", "รับป้ายชื่อ"],
+    buyNow: "ลงทะเบียนฟรี",
+    priceList: "ค่าเข้าชม",
+    termsTitle: "เงื่อนไขการลงทะเบียน",
+    acceptTerms: "ฉันได้อ่านและยอมรับเงื่อนไขการลงทะเบียนทั้งหมด",
+    acceptTermsShort: "ฉันยอมรับเงื่อนไขการลงทะเบียนและการใช้ข้อมูลส่วนบุคคล",
+    limitTerm: "ลงทะเบียนได้ครั้งละไม่เกินจำนวนที่ระบุในแต่ละประเภท และ 1 อีเมลลงทะเบียนได้ 1 ครั้งต่อประเภท",
+    confirmTickets: "ลงทะเบียน",
+    reviewTitle: "ตรวจสอบข้อมูลและยืนยัน",
+    toPayment: "ถัดไป: ตรวจสอบข้อมูล",
+    tickets: "ลงทะเบียนเข้างาน",
+    admission: "ประเภทผู้เข้างาน",
+    perOrderMax: (n: number) => `ลงทะเบียนได้ครั้งละไม่เกิน ${n} คน`,
+    remaining: () => "",
+    summary: "สรุปการลงทะเบียน",
+    noneSelected: "ยังไม่ได้เลือกประเภทผู้เข้างาน",
+    total: "จำนวนผู้ลงทะเบียน",
+    holdNote: (m: number) => `ระบบจะกันสิทธิ์ไว้ให้ ${m} นาทีระหว่างกรอกข้อมูล`,
+    checkout: "กรอกข้อมูลผู้ลงทะเบียน",
+    expiredTitle: "หมดเวลาลงทะเบียน",
+    expiredBody: "กรุณาเริ่มลงทะเบียนใหม่อีกครั้ง",
+    backToEvent: "กลับไปหน้าลงทะเบียน",
+    buyer: "ข้อมูลผู้ติดต่อ",
+    holders: "ข้อมูลบนป้ายชื่อ",
+    holdersNote: "ผู้เข้างานแต่ละคนได้ป้ายชื่อพร้อม QR 1 ใบ ชื่อและบริษัทนี้จะพิมพ์บนป้ายชื่อ",
+    ticketN: (n: number) => `คนที่ ${n}`,
+    sameAsBuyer: "ใช้ข้อมูลผู้ติดต่อ",
+    successTitle: "ลงทะเบียนสำเร็จ!",
+    successBody: "ป้ายชื่อพร้อม QR อยู่ด้านล่าง แสดง QR ที่จุดเช็คอิน หรือพิมพ์ป้ายชื่อมาเองเพื่อเข้างานได้เร็วขึ้น (prototype: ยังไม่ได้ส่งอีเมลจริง)",
+    orderCode: "เลขที่การลงทะเบียน",
+    errors: { ...th.errors, sold_out: "ที่ว่างไม่พอ กรุณาลดจำนวนผู้ลงทะเบียน", limit_exceeded: "เกินจำนวนที่ลงทะเบียนได้ต่อครั้ง", order_expired: "หมดเวลาลงทะเบียนแล้ว" },
+  },
+  en: {
+    steps: ["Choose type", "Your details", "Get badge"],
+    buyNow: "Register free",
+    priceList: "Admission",
+    termsTitle: "Registration terms",
+    acceptTerms: "I have read and accept all registration terms",
+    acceptTermsShort: "I accept the registration terms and personal data notice",
+    limitTerm: "Each registration is limited to the number shown per type, and one email can register once per type.",
+    confirmTickets: "Register",
+    reviewTitle: "Review & confirm",
+    toPayment: "Next: review",
+    tickets: "Register",
+    admission: "Visitor type",
+    perOrderMax: (n: number) => `Up to ${n} people per registration`,
+    remaining: () => "",
+    summary: "Registration summary",
+    noneSelected: "No visitor type selected",
+    total: "People",
+    holdNote: (m: number) => `Your place is held for ${m} minutes while you fill in your details.`,
+    checkout: "Registration details",
+    expiredTitle: "Registration timed out",
+    expiredBody: "Please start your registration again.",
+    backToEvent: "Back to registration",
+    buyer: "Contact details",
+    holders: "Badge details",
+    holdersNote: "Each person gets one badge with a QR code. The name and company are printed on the badge.",
+    ticketN: (n: number) => `Person ${n}`,
+    sameAsBuyer: "Same as contact",
+    successTitle: "You're registered!",
+    successBody: "Your name badge and QR are below. Show the QR at check-in, or print the badge to get in faster (prototype: no email is sent).",
+    orderCode: "Registration",
+    errors: { ...en.errors, sold_out: "Not enough places left. Register fewer people.", limit_exceeded: "Over the per-registration limit", order_expired: "Registration timed out" },
+  },
+};
+
+export function dict(locale: Locale, free = false): Dict {
+  return free ? { ...dicts[locale], ...freeOverrides[locale] } : dicts[locale];
 }
 
-export function errorText(locale: Locale, code: string | undefined): string {
-  const d = dicts[locale].errors;
+// งานฟรี = ทุกประเภทบัตรราคา 0 และไม่มีสินค้าเสียเงิน
+export function isFreeEvent(catalog: Catalog): boolean {
+  return catalog.ticketTypes.every((t) => t.priceSatang === 0) && catalog.products.every((p) => p.priceSatang === 0);
+}
+
+export function errorText(locale: Locale, code: string | undefined, free = false): string {
+  const d = dict(locale, free).errors;
   return (code && d[code]) || d.unknown!;
 }

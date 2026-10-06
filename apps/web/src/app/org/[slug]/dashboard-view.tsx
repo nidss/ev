@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Loading } from "@/components/loading";
 import { useBackend } from "@/lib/backend";
 import { baht, dayLabel } from "@/lib/format";
+import { isFreeEvent } from "@/lib/i18n";
 import { useLocale } from "@/lib/locale";
 import { od } from "@/lib/onsite-i18n";
 
@@ -21,6 +22,10 @@ export function DashboardView({ slug }: { slug: string }) {
   const d = onsite.dashboard(date);
   const nf = (n: number) => n.toLocaleString(locale === "th" ? "th-TH" : "en-US");
   const pct = (n: number) => `${Math.round(n * 100)}%`;
+  // งานลงทะเบียนฟรี: ไม่มีรายได้ให้แสดง — ใช้ช่องนั้นแสดงจำนวน lead ที่บูธได้รับแทน
+  const free = isFreeEvent(ticketing.catalog);
+  const leads = d.booths.reduce((s, x) => s + x.uniqueVisitors, 0);
+  const consented = d.booths.reduce((s, x) => s + x.consentedLeads, 0);
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -68,9 +73,15 @@ export function DashboardView({ slug }: { slug: string }) {
         <Tile label={t.registered} value={nf(d.totals.registered)}>
           <p className="text-xs text-muted">{t.rejected(d.totals.rejectedToday, d.totals.offlineSynced)}</p>
         </Tile>
-        <Tile label={t.revenue} value={baht(d.totals.revenueSatang, locale)}>
-          <p className="text-xs text-muted">{t.orders(d.totals.ordersConfirmed, d.totals.ordersPending)}</p>
-        </Tile>
+        {free ? (
+          <Tile label={t.boothLeads} value={nf(leads)}>
+            <p className="text-xs text-muted">{t.leadsConsented(consented)}</p>
+          </Tile>
+        ) : (
+          <Tile label={t.revenue} value={baht(d.totals.revenueSatang, locale)}>
+            <p className="text-xs text-muted">{t.orders(d.totals.ordersConfirmed, d.totals.ordersPending)}</p>
+          </Tile>
+        )}
         <Tile label={t.consentRate} value={pct(d.totals.consentRate)}>
           <Meter value={d.totals.consentRate} max={1} />
         </Tile>
@@ -109,7 +120,7 @@ export function DashboardView({ slug }: { slug: string }) {
                 <th className="py-1 font-medium" />
                 <th className="py-1 text-right font-medium">{t.sold}</th>
                 <th className="py-1 text-right font-medium">{t.inToday}</th>
-                <th className="py-1 text-right font-medium">{t.revenue}</th>
+                {!free && <th className="py-1 text-right font-medium">{t.revenue}</th>}
               </tr>
             </thead>
             <tbody className="tabular-nums">
@@ -128,7 +139,7 @@ export function DashboardView({ slug }: { slug: string }) {
                     <span className="block text-xs text-muted">/ {r.quota === null ? t.unlimited : nf(r.quota)}</span>
                   </td>
                   <td className="py-2 text-right">{r.ticketType.kind === "workshop" ? "—" : nf(r.checkedInToday)}</td>
-                  <td className="py-2 text-right">{r.revenueSatang ? baht(r.revenueSatang, locale) : "—"}</td>
+                  {!free && <td className="py-2 text-right">{r.revenueSatang ? baht(r.revenueSatang, locale) : "—"}</td>}
                 </tr>
               ))}
             </tbody>
@@ -136,6 +147,7 @@ export function DashboardView({ slug }: { slug: string }) {
         </section>
 
         <div className="space-y-6">
+          {d.workshops.length > 0 && (
           <section className="card p-5">
             <h2 className="font-semibold">{t.workshops}</h2>
             <ul className="mt-3 space-y-3 text-sm">
@@ -160,6 +172,7 @@ export function DashboardView({ slug }: { slug: string }) {
               ))}
             </ul>
           </section>
+          )}
 
           <section className="card p-5">
             <h2 className="font-semibold">{t.checkpoints}</h2>

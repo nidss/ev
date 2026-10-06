@@ -11,15 +11,16 @@ import {
   verifyAttendeeCookie,
   type Attendee,
 } from "../src";
+import { createPaidFixtureCatalog } from "./fixtures/paid-catalog";
 
 const SLUG = "bangkok-event-tech-2026";
 const DAY1 = "2026-11-21";
 const DAY2 = "2026-11-22";
 
-function setup() {
+function setup(catalog = createPaidFixtureCatalog()) {
   const payments = new MockPaymentProvider({ secret: "s", payPageBaseUrl: "/mock-pay" });
   const ticketing = new TicketingService({
-    catalog: createMockCatalog(),
+    catalog,
     payments,
     baseUrl: "",
     now: () => new Date("2026-10-05T10:00:00+07:00"),
@@ -190,20 +191,40 @@ describe("booth leads and sponsor portal", () => {
 });
 
 describe("dashboard + seed", () => {
-  it("seeds consistent demo data and summarises it", async () => {
-    const { ticketing, onsite } = setup();
+  it("seeds consistent demo data for the free MOC Expo event", async () => {
+    const { ticketing, onsite } = setup(createMockCatalog());
     const payments = (ticketing as unknown as { payments: MockPaymentProvider }).payments;
     const made = await seedDemo(ticketing, onsite, payments, { orders: 120 });
-    expect(made).toBeGreaterThan(100);
-    const d = onsite.dashboard(DAY1);
+    expect(made).toBe(120);
+    const [day1] = onsite.eventDates();
+    expect(day1).toBe("2026-11-26");
+    const d = onsite.dashboard(day1!);
     expect(d.totals.registered).toBeGreaterThan(100);
     expect(d.totals.checkedInToday).toBeGreaterThan(30);
     expect(d.totals.checkedInToday).toBeLessThanOrEqual(d.totals.expectedToday);
     expect(d.checkinsByHalfHour.reduce((s, b) => s + b.count, 0)).toBe(
       d.byCheckpoint.filter((c) => c.checkpoint.kind === "entrance").reduce((s, c) => s + c.accepted, 0),
     );
-    expect(d.totals.revenueSatang).toBeGreaterThan(0);
+    // งานฟรี: ไม่มีรายได้และไม่มี order ค้างชำระ
+    expect(d.totals.revenueSatang).toBe(0);
+    expect(d.totals.ordersPending).toBe(0);
     expect(d.booths[0]!.uniqueVisitors).toBeGreaterThan(0);
+    // Business Matching เข้าได้เฉพาะ Trade / Press
+    const bm = d.byCheckpoint.find((c) => c.checkpoint.id === "cp_bm")!;
+    expect(bm.accepted).toBeGreaterThan(0);
+  });
+
+  it("gives every booth a category that has a coloured zone on the floor plan", () => {
+    const catalog = createMockCatalog();
+    const zoned = new Set(catalog.floorPlan!.zones.map((z) => z.categoryId));
+    for (const b of catalog.booths) {
+      const cat = catalog.categories.find((c) => c.id === b.categoryId)!;
+      expect(cat).toBeDefined();
+      expect(b.code.startsWith(cat.code)).toBe(true);
+      expect(zoned.has(cat.id)).toBe(true);
+    }
+    expect(catalog.ticketTypes.every((t) => t.priceSatang === 0 && t.kind !== "workshop")).toBe(true);
+    expect(catalog.products).toHaveLength(0);
   });
 });
 

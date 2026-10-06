@@ -30,7 +30,8 @@ interface Saved {
   charges: MockCharge[];
 }
 
-const STORAGE_KEY = "ev-prototype-state-v1";
+// v2 = งาน MOC Expo 2026 (ข้อมูลของงานเดิมใน v1 ใช้กับ catalog ใหม่ไม่ได้)
+const STORAGE_KEY = "ev-prototype-state-v2";
 // secret ของ mock gateway / cookie บูธ — prototype ฝั่งเบราว์เซอร์จึงไม่ใช่ความลับจริง
 const MOCK_SECRET = "browser-prototype-mock-secret";
 export const ATTENDEE_SECRET = "browser-prototype-attendee-secret";

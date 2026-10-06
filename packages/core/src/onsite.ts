@@ -461,14 +461,16 @@ export class OnsiteService {
       return s.slotDate === null || s.slotDate === operatingDate;
     });
 
-    // เช็คอินต่อช่วง 30 นาที (เวลาท้องถิ่นของงาน) 08:00–18:00
-    const buckets = Array.from({ length: 20 }, (_, i) => ({
-      label: `${String(8 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+    // เช็คอินต่อช่วง 30 นาที (เวลาท้องถิ่นของงาน) ตั้งแต่ 1 ชั่วโมงก่อนงานเปิดจนถึงเวลาปิด
+    const firstHour = Math.max(0, localTime(catalog.event.startsAt, tz)[0] - 1);
+    const lastHour = Math.max(firstHour + 1, localTime(catalog.event.endsAt, tz)[0]);
+    const buckets = Array.from({ length: (lastHour - firstHour) * 2 }, (_, i) => ({
+      label: `${String(firstHour + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
       count: 0,
     }));
     for (const c of acceptedEntrance) {
       const [h, m] = localTime(c.scannedAt, tz);
-      const idx = (h - 8) * 2 + (m >= 30 ? 1 : 0);
+      const idx = (h - firstHour) * 2 + (m >= 30 ? 1 : 0);
       if (idx >= 0 && idx < buckets.length) buckets[idx]!.count++;
     }
 

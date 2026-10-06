@@ -1,4 +1,4 @@
-import type { I18n, Locale } from "@ev/core";
+import type { Booth, Catalog, I18n, Locale } from "@ev/core";
 
 export function tr(text: I18n, locale: Locale): string {
   return text[locale] || text.th;
@@ -43,4 +43,11 @@ export function timeRange(startIso: string, endIso: string, locale: Locale): str
     timeZone: TZ,
   });
   return `${t.format(new Date(startIso))}–${t.format(new Date(endIso))}`;
+}
+
+// "โซน A · อาหารและเครื่องดื่ม" — บูธที่ไม่มีหมวดใช้ชื่อโซนเดิม
+export function zoneLabel(catalog: Catalog, booth: Booth, locale: Locale): string {
+  const cat = catalog.categories.find((c) => c.id === booth.categoryId);
+  const zone = locale === "th" ? "โซน" : "Zone";
+  return cat ? `${zone} ${cat.code} · ${tr(cat.name, locale)}` : `${zone} ${booth.zone}`;
 }

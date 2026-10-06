@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  createMockCatalog,
   MockPaymentProvider,
   priceOrder,
   TicketingError,
@@ -8,6 +7,7 @@ import {
   verifyTicketQr,
   type Catalog,
 } from "../src";
+import { createPaidFixtureCatalog } from "./fixtures/paid-catalog";
 
 const SLUG = "bangkok-event-tech-2026";
 
@@ -16,7 +16,7 @@ function setup(opts: { catalog?: Catalog; start?: string } = {}) {
   const clock = () => now;
   const payments = new MockPaymentProvider({ secret: "test-secret", payPageBaseUrl: "http://x/mock-pay", now: clock });
   const svc = new TicketingService({
-    catalog: opts.catalog ?? createMockCatalog(),
+    catalog: opts.catalog ?? createPaidFixtureCatalog(),
     payments,
     baseUrl: "http://x",
     now: clock,
@@ -465,7 +465,7 @@ describe("checkout", () => {
   });
 
   it("releases a reserved promo use when the order expires", async () => {
-    const catalog = createMockCatalog();
+    const catalog = createPaidFixtureCatalog();
     catalog.promoCodes.find((p) => p.code === "TEAM10")!.maxUses = 1;
     const { svc, advance } = setup({ catalog });
     const a = svc.createOrder(SLUG, { acceptTerms: true, lines: [{ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 }] });

@@ -50,32 +50,29 @@ export async function seedDemo(
   const total = opts.orders ?? 180;
   for (let i = 0; i < total; i++) {
     const roll = r();
-    const lines: OrderLineInput[] = [];
     let unlockCode: string | null = null;
-    if (roll < 0.62) {
-      lines.push({ kind: "ticket", ticketTypeId: "tt_expo", slotId: r() < 0.6 ? "slot_day1" : "slot_day2", quantity: 1 });
-    } else if (roll < 0.9) {
-      lines.push({ kind: "ticket", ticketTypeId: "tt_conf", quantity: 1 });
-      if (r() < 0.35) lines.push({ kind: "ticket", ticketTypeId: pick(["tt_ws_ai", "tt_ws_line", "tt_ws_fin"]), quantity: 1 });
-      if (r() < 0.3) lines.push({ kind: "addon", productId: "pr_lunch", quantity: 1 });
-    } else if (roll < 0.97) {
-      lines.push({ kind: "ticket", ticketTypeId: "tt_vip", quantity: 1 });
-      if (r() < 0.4) lines.push({ kind: "ticket", ticketTypeId: "tt_ws_fin", quantity: 1 });
-    } else {
-      lines.push({ kind: "ticket", ticketTypeId: "tt_press", quantity: 1 });
+    let ticketTypeId = "tt_visitor";
+    if (roll < 0.72) ticketTypeId = "tt_visitor";
+    else if (roll < 0.97) ticketTypeId = "tt_trade";
+    else {
+      ticketTypeId = "tt_press";
       unlockCode = "PRESS2026";
     }
+    const lines: OrderLineInput[] = [{ kind: "ticket", ticketTypeId, quantity: 1 }];
     try {
       const { order, accessToken } = ticketing.createOrder(slug, { acceptTerms: true, lines, unlockCode });
       const buyer = person();
+      // ผู้เข้าชมทั่วไปส่วนใหญ่ไม่ได้มาในนามบริษัท
+      const company = ticketTypeId === "tt_visitor" && r() < 0.6 ? null : buyer.company;
+      const jobTitle = company ? buyer.jobTitle : null;
       const holders = order.items
         .filter((it) => it.kind === "ticket")
-        .map((it) => ({ orderItemId: it.id, index: 0, ...buyer }));
+        .map((it) => ({ orderItemId: it.id, index: 0, ...buyer, company, jobTitle }));
       const res = await ticketing.submitCheckout(order.id, accessToken, {
         buyer: { firstName: buyer.firstName, lastName: buyer.lastName, email: buyer.email, phone: null, nationality: buyer.nationality },
         holders,
-        consents: { shareWithSponsors: r() < 0.68, organizerMarketing: r() < 0.4 },
-        paymentMethod: pick(["promptpay", "card", "mobile_banking"] as const),
+        consents: { shareWithSponsors: true, organizerMarketing: r() < 0.4 },
+        paymentMethod: "promptpay",
       });
       if (res.status === "redirect") {
         const view = ticketing.getOrder(order.id, accessToken);
@@ -88,11 +85,14 @@ export async function seedDemo(
     }
   }
 
-  // เช็คอินวันแรก: ประตู A/B ช่วง 08:30–13:30 ประมาณ 70% ของคนที่มีบัตรวันนั้น
+  // เช็คอินวันแรก: ประตู 1/2 ตั้งแต่ 30 นาทีก่อนงานเปิด ราว 5 ชั่วโมง ประมาณ 70% ของผู้ลงทะเบียน
   const attendees = [...ticketing.store.attendees.values()];
   const admission = new Set(onsite.admissionTicketTypeIds());
-  const at = (date: string, minutesFrom0830: number) =>
-    new Date(Date.parse(`${date}T08:30:00+07:00`) + minutesFrom0830 * 60_000).toISOString();
+  const { startsAt } = ticketing.catalog.event;
+  const openTime = startsAt.slice(11, 19); // HH:MM:SS
+  const offset = startsAt.slice(19); // +07:00
+  const at = (date: string, minutesFromGateOpen: number) =>
+    new Date(Date.parse(`${date}T${openTime}${offset}`) + (minutesFromGateOpen - 30) * 60_000).toISOString();
   let scanNo = 0;
   const scanId = () => `00000000-0000-4000-8000-${String(++scanNo).padStart(12, "0")}`;
   const checkedIn: typeof attendees = [];
@@ -124,29 +124,31 @@ export async function seedDemo(
     onsite.checkIn({ id: scanId(), code: `EV-XXXX-${1000 + i}`, checkpointId: "cp_gate_a", operatingDate: day1!, deviceName: "Gate A - iPad 1", scannedAt: at(day1!, 30 + i * 40) });
   }
 
-  // workshop ของวันแรก
-  for (const a of attendees) {
-    if (a.ticketTypeId !== "tt_ws_ai" && a.ticketTypeId !== "tt_ws_line") continue;
-    if (r() > 0.85) continue;
+  // โซน Business Matching: ผู้ประกอบการ (Trade) บางส่วนเข้าช่วงบ่าย และมีคนทั่วไปเดินเข้าผิดโซนบ้าง
+  for (const a of checkedIn) {
+    const trade = a.ticketTypeId === "tt_trade";
+    if (r() > (trade ? 0.6 : 0.03)) continue;
     onsite.checkIn({
       id: scanId(),
       code: a.qrToken,
-      checkpointId: a.ticketTypeId === "tt_ws_ai" ? "cp_room_w1" : "cp_room_w2",
+      checkpointId: "cp_bm",
       operatingDate: day1!,
-      deviceName: "Workshop door",
-      scannedAt: at(day1!, a.ticketTypeId === "tt_ws_ai" ? 80 : 320),
+      deviceName: "Business Matching desk",
+      scannedAt: at(day1!, 240 + Math.floor(r() * 180)),
     });
   }
 
   // สแกนบูธ: คนที่เข้างานแล้วเดินบูธ 0–4 บูธ (บูธใหญ่ได้คนมากกว่า)
   const booths = ticketing.catalog.booths;
-  const weights = [5, 4, 3, 2.5, 2, 1.5];
+  // บูธต้นรายการได้คนมากกว่าเล็กน้อย
+  const weights = booths.map((_, i) => 2 + ((booths.length - i) % 5));
   const ratings: (LeadRating | null)[] = ["hot", "warm", "warm", "cold", null, null];
   for (const a of checkedIn) {
     const visits = Math.floor(r() * 5);
     const seen = new Set<string>();
     for (let v = 0; v < visits; v++) {
       const booth = weightedPick(booths, weights, r);
+      if (!booth) break;
       if (seen.has(booth.id)) continue;
       seen.add(booth.id);
       const time = at(day1!, 60 + Math.floor(r() * 420));

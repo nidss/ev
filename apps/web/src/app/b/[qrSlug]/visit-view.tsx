@@ -2,6 +2,7 @@
 
 import { Loading } from "@/components/loading";
 import { useBackend } from "@/lib/backend";
+import { zoneLabel } from "@/lib/format";
 import { currentAttendeeId } from "@/lib/local-api";
 import { useLocale } from "@/lib/locale";
 import { od } from "@/lib/onsite-i18n";
@@ -24,7 +25,7 @@ export function VisitView({ qrSlug }: { qrSlug: string }) {
       <div className="card overflow-hidden">
         <div className="bg-brand px-5 py-4 text-brand-ink">
           <div className="text-xs font-semibold opacity-80">
-            {t.welcomeBooth} · {booth.code} · Zone {booth.zone}
+            {t.welcomeBooth} · {booth.code} · {zoneLabel(ticketing.catalog, booth, locale)}
           </div>
           <h1 className="mt-1 text-2xl font-bold">{sponsor.name}</h1>
         </div>

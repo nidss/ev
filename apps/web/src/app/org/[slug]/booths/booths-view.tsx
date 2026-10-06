@@ -4,17 +4,19 @@ import Link from "next/link";
 import { Loading } from "@/components/loading";
 import { QrSvg } from "@/components/qr-svg";
 import { useBackend } from "@/lib/backend";
+import { zoneLabel } from "@/lib/format";
 import { useLocale } from "@/lib/locale";
 import { od } from "@/lib/onsite-i18n";
 import { absoluteUrl } from "@/lib/paths";
 
-// รายการบูธ + QR ประจำบูธ (พิมพ์ไปติดที่บูธ) + ลิงก์หน้า staff / sponsor
+// รายการบูธ + QR ประจำบูธ (พิมพ์ไปติดที่บูธ) + ลิงก์หน้า staff / ผู้ออกบูธ
 export function BoothsView({ slug }: { slug: string }) {
   const { locale } = useLocale();
   const backend = useBackend();
   if (!backend) return <Loading />;
   const t = od(locale);
-  const { booths, sponsors } = backend.ticketing.catalog;
+  const { catalog } = backend.ticketing;
+  const { booths, sponsors } = catalog;
   const items = booths.map((b) => ({
     booth: b,
     sponsor: sponsors.find((s) => s.id === b.sponsorId)!,
@@ -32,11 +34,15 @@ export function BoothsView({ slug }: { slug: string }) {
       <p className="mt-1 text-sm text-muted">{t.boothQrNote}</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map(({ booth, sponsor, qr }) => (
-          <article key={booth.id} className="card p-5">
+          <article
+            key={booth.id}
+            className="card border-t-4 p-5"
+            style={{ borderTopColor: catalog.categories.find((c) => c.id === booth.categoryId)?.color }}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-muted">
-                  {booth.code} · Zone {booth.zone} · {sponsor.tier}
+                  {booth.code} · {zoneLabel(catalog, booth, locale)}
                 </div>
                 <h2 className="font-semibold">{sponsor.name}</h2>
               </div>

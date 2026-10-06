@@ -2,17 +2,19 @@
 
 import { Loading } from "@/components/loading";
 import { useBackend } from "@/lib/backend";
+import { zoneLabel } from "@/lib/format";
 import { useLocale } from "@/lib/locale";
 import { od } from "@/lib/onsite-i18n";
 import { ExportButton } from "./export-button";
 
-// Sponsor portal: เห็นตัวบุคคลเฉพาะคนที่ยินยอม คนที่เหลือเป็นตัวเลขเท่านั้น
+// หน้าผู้ออกบูธ: เห็นตัวบุคคลเฉพาะคนที่ยินยอม คนที่เหลือเป็นตัวเลขเท่านั้น
 export function SponsorView({ sponsorId }: { sponsorId: string }) {
   const { locale } = useLocale();
   const b = useBackend();
   if (!b) return <Loading />;
   const t = od(locale);
   const v = b.onsite.sponsorView(sponsorId);
+  const { catalog } = b.ticketing;
   const fmt = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-GB", {
     day: "numeric",
     month: "short",
@@ -32,7 +34,7 @@ export function SponsorView({ sponsorId }: { sponsorId: string }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm text-muted">
-            {t.sponsorPortal} · {v.booths.map((b) => b.code).join(", ")} · {v.sponsor.tier}
+            {t.sponsorPortal} · {v.booths.map((b) => `${b.code} (${zoneLabel(catalog, b, locale)})`).join(", ")}
           </p>
           <h1 className="text-2xl font-bold">{v.sponsor.name}</h1>
         </div>
