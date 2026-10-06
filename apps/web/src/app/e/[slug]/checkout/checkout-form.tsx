@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
-import type { Buyer, Holder, HolderInfo, Locale, PaymentMethod } from "@ev/core";
+import type { Buyer, Holder, HolderInfo, Locale, PaymentMethod, TermsDocument } from "@ev/core";
 import { Steps } from "@/components/steps";
+import { TermsModal } from "@/components/terms-modal";
 import { baht } from "@/lib/format";
 import { dict, errorText } from "@/lib/i18n";
 import { api } from "@/lib/local-api";
@@ -52,6 +53,7 @@ export function CheckoutForm(props: {
   initialBuyer: Buyer | null;
   initialHolders: Holder[];
   initialPromo: { code: string; label: string } | null;
+  termsDoc: TermsDocument;
 }) {
   const { locale, items } = props;
   const t = dict(locale);
@@ -111,6 +113,7 @@ export function CheckoutForm(props: {
   const [consents, setConsents] = useState({ shareWithSponsors: false, organizerMarketing: false });
   // ขั้น 4 กรอกข้อมูล → ขั้น 5 ตรวจสอบและชำระเงิน (อยู่หน้าเดียวกัน ข้อมูลไม่หายเมื่อย้อนกลับ)
   const [phase, setPhase] = useState<"info" | "review">("info");
+  const [termsOpen, setTermsOpen] = useState(false);
   const [method, setMethod] = useState<PaymentMethod>("promptpay");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +299,12 @@ export function CheckoutForm(props: {
               )}
 
               <section className="card p-5">
-                <h2 className="font-semibold">{t.consents}</h2>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="font-semibold">{t.consents}</h2>
+                  <button type="button" className="text-sm text-brand underline" onClick={() => setTermsOpen(true)}>
+                    {t.readFullTerms}
+                  </button>
+                </div>
                 <div className="mt-3 space-y-3 text-sm">
                   <label className="flex gap-2">
                     <input
@@ -488,6 +496,7 @@ export function CheckoutForm(props: {
           )}
         </aside>
       </div>
+      <TermsModal locale={locale} doc={props.termsDoc} open={termsOpen} onClose={() => setTermsOpen(false)} />
     </form>
   );
 }

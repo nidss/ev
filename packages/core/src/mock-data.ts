@@ -1,9 +1,113 @@
 // ข้อมูลตัวอย่าง (mock) ของงาน 1 งาน — มีทั้งบัตรฟรี บัตรเสียเงิน workshop และ add-on
 // ยังไม่มีผังที่นั่ง: ความจุนับเป็นจำนวนต่อรอบ / ต่อประเภทบัตรเท่านั้น
-import type { Booth, Catalog, Checkpoint, EventInfo, Product, PromoCode, Sponsor, TicketType, TimeSlot } from "./types";
+import type { Booth, Catalog, Checkpoint, EventInfo, Product, PromoCode, Sponsor, TermsDocument, TicketType, TimeSlot } from "./types";
 
 const EVENT_ID = "evt_bet26";
 const baht = (n: number) => n * 100;
+
+// เงื่อนไขการซื้อบัตรและการใช้ข้อมูลส่วนบุคคล (ฉบับร่าง — ต้องให้ฝ่ายกฎหมายตรวจก่อนใช้จริง)
+// สอดคล้องกับการทำงานของระบบ: ข้อมูลส่งให้ sponsor เฉพาะคนที่ติ๊กยินยอมตอนลงทะเบียน
+const ORGANIZER_TH = "บริษัท อีวี เดโม ออร์แกไนเซอร์ จำกัด";
+const ORGANIZER_EN = "EV Demo Organizer Co., Ltd.";
+const EVENT_NAME = "Bangkok Event Tech & Finance Expo 2026";
+const PRIVACY_EMAIL = "privacy@ev-demo.example";
+
+const termsDocument: TermsDocument = {
+  title: { th: "เงื่อนไขการซื้อบัตรและการใช้ข้อมูลส่วนบุคคล", en: "Ticket Terms and Personal Data Notice" },
+  updatedAt: "2026-10-06",
+  sections: [
+    {
+      heading: { th: "1. การซื้อและการใช้บัตร", en: "1. Buying and using tickets" },
+      paragraphs: [
+        {
+          th: `งาน ${EVENT_NAME} จัดโดย ${ORGANIZER_TH} ("ผู้จัดงาน") บัตรเข้างาน 1 ใบใช้ได้กับผู้ถือบัตร 1 คนตามชื่อที่ลงทะเบียน และต้องแสดง QR Code บนบัตรหรือรหัสบัตรที่จุดเช็คอิน`,
+          en: `${EVENT_NAME} is organised by ${ORGANIZER_EN} (the "Organiser"). Each ticket admits one registered holder, who must show the ticket QR code or ticket code at check-in.`,
+        },
+        {
+          th: "บัตรรายวันใช้ได้เฉพาะวันที่เลือก บัตร Conference และ VIP ใช้ได้ทั้ง 2 วัน บัตร Workshop ต้องใช้คู่กับบัตรเข้างาน และเข้าได้เฉพาะรอบและห้องที่ระบุบนบัตร",
+          en: "Day passes are valid only on the selected day. Conference and VIP passes are valid on both days. Workshop tickets must be used with an admission ticket and are valid only for the session and room shown.",
+        },
+        {
+          th: "เมื่อกดยืนยันบัตร ระบบจะกันที่นั่งไว้ 15 นาที หากชำระเงินไม่สำเร็จภายในเวลาดังกล่าว ที่นั่งจะถูกปล่อยคืนโดยอัตโนมัติ ราคาบัตรรวมภาษีมูลค่าเพิ่มแล้ว และจำนวนบัตรสูงสุดต่อคำสั่งซื้อเป็นไปตามที่ระบุในแต่ละประเภทบัตร",
+          en: "Confirming your tickets holds them for 15 minutes; unpaid tickets are released automatically. Prices include VAT. The maximum number of tickets per order is shown for each ticket type.",
+        },
+        {
+          th: "ห้ามนำบัตรไปขายต่อในราคาที่สูงกว่าราคาหน้าบัตร ผู้จัดงานขอสงวนสิทธิ์ยกเลิกบัตรที่พบว่ามีการขายต่อหรือได้มาโดยไม่ชอบ โดยไม่คืนเงิน",
+          en: "Tickets may not be resold above face value. The Organiser may cancel, without refund, tickets found to be resold or obtained improperly.",
+        },
+      ],
+    },
+    {
+      heading: { th: "2. การยกเลิก การคืนเงิน และการเปลี่ยนแปลงงาน", en: "2. Cancellation, refunds and changes" },
+      paragraphs: [
+        {
+          th: "ขอคืนเงินได้ถึง 7 วันก่อนวันงาน (ภายใน 14 พ.ย. 2569) ยกเว้นบัตรที่ซื้อด้วยโค้ดส่วนลด บัตรที่คืนเงินแล้วจะใช้เข้างานไม่ได้",
+          en: "Refunds are available until 7 days before the event (by 14 Nov 2026), except tickets bought with a promo code. Refunded tickets can no longer be used.",
+        },
+        {
+          th: "หากงานถูกยกเลิกโดยผู้จัดงาน ผู้ซื้อจะได้รับเงินคืนเต็มจำนวน หากมีการเลื่อนวันหรือเปลี่ยนสถานที่ บัตรเดิมยังใช้ได้ และผู้ที่ไม่สะดวกสามารถขอคืนเงินได้ภายในระยะเวลาที่ผู้จัดงานแจ้ง",
+          en: "If the Organiser cancels the event, you will receive a full refund. If the date or venue changes, existing tickets remain valid and holders who cannot attend may request a refund within the period the Organiser announces.",
+        },
+        {
+          th: "ผู้จัดงานขอสงวนสิทธิ์ในการเปลี่ยนแปลงกำหนดการ วิทยากร หรือรายละเอียดของกิจกรรมตามความเหมาะสม",
+          en: "The Organiser may change the programme, speakers or activity details where necessary.",
+        },
+      ],
+    },
+    {
+      heading: { th: "3. การเก็บและใช้ข้อมูลส่วนบุคคล", en: "3. How we use your personal data" },
+      paragraphs: [
+        {
+          th: `ด้วยการกรอกและส่งข้อมูลในแบบฟอร์มนี้ ท่านรับทราบว่าผู้จัดงานและผู้ให้บริการระบบจำหน่ายบัตรจะเก็บ ใช้ และประมวลผลข้อมูลของท่าน (เช่น ชื่อ อีเมล เบอร์โทรศัพท์ สัญชาติ บริษัท ตำแหน่ง และประวัติการเช็คอิน) เพื่อออกและส่งบัตร ยืนยันตัวตนและตรวจสอบสิทธิ์ที่จุดเช็คอิน แจ้งข้อมูลที่จำเป็นเกี่ยวกับงานทางอีเมลและ/หรือโทรศัพท์ ออกใบเสร็จหรือใบกำกับภาษี และจัดเตรียมเนื้อหาและกิจกรรมภายในงานให้เหมาะสมกับผู้เข้าร่วม`,
+          en: "By submitting this form you acknowledge that the Organiser and its ticketing provider will collect, use and process your data (such as name, email, phone, nationality, company, job title and check-in history) to issue and deliver tickets, verify identity and entitlement at check-in, send essential event information by email and/or phone, issue receipts or tax invoices, and plan content and activities for attendees.",
+        },
+        {
+          th: "ข่าวสารเกี่ยวกับงานครั้งถัดไปจะส่งให้เฉพาะผู้ที่เลือก \"รับข่าวสารงานครั้งถัดไปจากผู้จัด\" เท่านั้น",
+          en: "News about future events is sent only to those who opt in to receive it.",
+        },
+        {
+          th: "ผู้จัดงานจะไม่เปิดเผยข้อมูลส่วนบุคคลของท่านแก่บริษัทหรือหน่วยงานภายนอกที่ไม่เกี่ยวข้องกับงานนี้ โดยไม่ได้รับความยินยอมจากท่าน เว้นแต่กฎหมายกำหนด ข้อมูลจะถูกเก็บรักษาด้วยมาตรการความปลอดภัยที่เหมาะสม และจะลบหรือทำให้ไม่สามารถระบุตัวตนได้เมื่อพ้นระยะเวลาที่จำเป็น",
+          en: "The Organiser will not disclose your personal data to unrelated third parties without your consent, except where required by law. Data is kept with appropriate security measures and deleted or anonymised once no longer needed.",
+        },
+      ],
+    },
+    {
+      heading: { th: "4. การแชร์ข้อมูลกับสปอนเซอร์ที่บูธ", en: "4. Sharing data with sponsors at booths" },
+      paragraphs: [
+        {
+          th: "ภายในงาน ระหว่างเยี่ยมชมบูธ ท่านอาจถูกขอให้สแกน QR Code บนบัตร/ป้ายชื่อ หรือแตะสายรัดข้อมือ และท่านสามารถสแกน QR Code ของบูธเพื่อกด \"สนใจ\" หรือ \"ขอข้อมูลเพิ่ม\" ได้ ท่านมีสิทธิ์เลือกว่าจะให้สแกนหรือไม่",
+          en: "At booths you may be asked to have your ticket/badge QR code scanned or tap your wristband, and you may scan a booth's QR code to tap \"Interested\" or \"Request info\". Whether to be scanned is your choice.",
+        },
+        {
+          th: "ข้อมูลของท่าน (ชื่อ อีเมล บริษัท ตำแหน่ง และความสนใจที่ท่านแสดงที่บูธ) จะถูกส่งให้เฉพาะสปอนเซอร์ของบูธที่ท่านถูกสแกนหรือสแกนเท่านั้น และเฉพาะกรณีที่ท่านเลือก \"ยินยอมให้ส่งข้อมูลให้ sponsor\" ในขั้นกรอกข้อมูล หากไม่ได้ยินยอม สปอนเซอร์จะเห็นเพียงจำนวนผู้เข้าชมบูธ โดยไม่เห็นข้อมูลที่ระบุตัวท่าน",
+          en: "Your details (name, email, company, job title and the interest you showed at the booth) are shared only with the sponsor of a booth where you were scanned or which you scanned, and only if you ticked \"share my details with sponsors\" when registering. Otherwise the sponsor sees only a visitor count, not who you are.",
+        },
+        {
+          th: "เมื่อข้อมูลถูกส่งให้สปอนเซอร์แล้ว ข้อมูลนั้นจะอยู่ภายใต้นโยบายความเป็นส่วนตัวของสปอนเซอร์รายนั้น ผู้จัดงานบันทึกประวัติการส่งต่อข้อมูลทุกครั้ง แต่ไม่รับผิดชอบต่อการที่สปอนเซอร์นำข้อมูลของท่านไปใช้",
+          en: "Once shared, your data is governed by that sponsor's privacy policy. The Organiser logs every data export but is not responsible for how sponsors use your data.",
+        },
+      ],
+    },
+    {
+      heading: { th: "5. สิทธิ์ของท่าน", en: "5. Your rights" },
+      paragraphs: [
+        {
+          th: `ท่านมีสิทธิ์ขอเข้าถึง ขอสำเนา ขอแก้ไข ขอลบ หรือขอระงับการใช้ข้อมูลส่วนบุคคลของท่าน และถอนความยินยอมในการส่งข้อมูลให้สปอนเซอร์หรือรับข่าวสารได้ทุกเมื่อ โดยติดต่อ ${PRIVACY_EMAIL} การถอนความยินยอมไม่กระทบข้อมูลที่ส่งให้สปอนเซอร์ไปแล้วก่อนหน้านั้น`,
+          en: `You may request access to, a copy of, correction, deletion or restriction of your personal data, and withdraw consent to sponsor sharing or marketing at any time by contacting ${PRIVACY_EMAIL}. Withdrawal does not affect data already shared with sponsors before then.`,
+        },
+      ],
+    },
+    {
+      heading: { th: "6. การถ่ายภาพและบันทึกวิดีโอ", en: "6. Photography and video" },
+      paragraphs: [
+        {
+          th: "ภายในงานมีการถ่ายภาพและบันทึกวิดีโอเพื่อใช้ประชาสัมพันธ์งาน การเข้าร่วมงานถือว่าท่านรับทราบว่าภาพของท่านอาจปรากฏในสื่อดังกล่าว หากไม่ประสงค์ให้ใช้ภาพที่เห็นตัวท่านชัดเจน โปรดแจ้งเจ้าหน้าที่หรือติดต่ออีเมลข้างต้น",
+          en: "Photos and video are taken at the event for promotion. By attending you acknowledge you may appear in this material. If you prefer clearly identifiable images of you not to be used, tell our staff or contact the email above.",
+        },
+      ],
+    },
+  ],
+};
 
 const event: EventInfo = {
   id: EVENT_ID,
@@ -48,6 +152,7 @@ const event: EventInfo = {
     th: "ขอคืนเงินได้ถึง 7 วันก่อนวันงาน (ภายใน 14 พ.ย. 2569) ยกเว้นบัตรที่ซื้อด้วยโค้ดส่วนลด",
     en: "Refunds available until 7 days before the event (by 14 Nov 2026), except tickets bought with a promo code.",
   },
+  termsDocument,
   terms: [
     {
       th: "บัตรเข้างาน 1 ใบใช้ได้กับผู้ถือบัตร 1 คน และต้องแสดง QR บนบัตรที่จุดเช็คอิน",

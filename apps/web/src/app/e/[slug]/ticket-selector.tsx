@@ -59,6 +59,10 @@ export function TicketSelector(props: {
   tickets: Record<string, WizardTicket>;
   products: WizardProduct[];
   unlock: { code: string; valid: boolean } | null;
+  // ช่องยอมรับเงื่อนไขควบคุมจากหน้างาน (ปุ่ม "ยอมรับเงื่อนไข" ใน modal ติ๊กให้ได้)
+  agreed: boolean;
+  onAgreedChange: (v: boolean) => void;
+  onOpenTerms: () => void;
 }) {
   const { locale, rounds, tickets, products } = props;
   const t = dict(locale);
@@ -70,7 +74,7 @@ export function TicketSelector(props: {
     rounds.find((r) => r.status === "on_sale") ??
     null;
 
-  const [agree, setAgree] = useState(false);
+  const agree = props.agreed;
   const [qty, setQty] = useState<Record<string, number>>({});
   const [codeInput, setCodeInput] = useState(props.unlock?.code ?? "");
   const [busy, setBusy] = useState(false);
@@ -340,15 +344,20 @@ export function TicketSelector(props: {
                 {busy ? t.processing : t.confirmTickets}
               </button>
             </div>
-            <label className="mt-2 flex items-start gap-2 text-xs lg:mt-3 lg:text-sm">
-              <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-              <span>
-                {t.acceptTermsShort}{" "}
-                <a href="#terms" className="text-brand underline">
-                  {t.readTerms}
-                </a>
-              </span>
-            </label>
+            <div className="mt-2 flex flex-wrap items-start gap-x-1 text-xs lg:mt-3 lg:text-sm">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={agree}
+                  onChange={(e) => props.onAgreedChange(e.target.checked)}
+                />
+                <span>{t.acceptTermsShort}</span>
+              </label>
+              <button type="button" className="text-brand underline" onClick={props.onOpenTerms}>
+                {t.readTerms}
+              </button>
+            </div>
             {blocked && <p className="mt-2 text-xs text-amber-600">{t.workshopNeedsAdmission}</p>}
             {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
             <button className="btn-primary mt-3 hidden w-full lg:flex" disabled={!canConfirm} onClick={confirm}>

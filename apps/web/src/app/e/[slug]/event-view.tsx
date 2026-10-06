@@ -1,7 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { Loading } from "@/components/loading";
+import { TermsModal } from "@/components/terms-modal";
 import { useBackend } from "@/lib/backend";
 import { baht, dateRange, dayLabel, timeRange, tr } from "@/lib/format";
 import { dict } from "@/lib/i18n";
@@ -13,6 +15,8 @@ import { TicketSelector, type WizardProduct, type WizardRound, type WizardTicket
 export function EventView({ slug }: { slug: string }) {
   const { locale } = useLocale();
   const code = useSearchParams().get("code");
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const b = useBackend();
   if (!b) return <Loading />;
   const t = dict(locale);
@@ -136,6 +140,17 @@ export function EventView({ slug }: { slug: string }) {
         tickets={tickets}
         products={products}
         unlock={view.unlock}
+        agreed={agreed}
+        onAgreedChange={setAgreed}
+        onOpenTerms={() => setTermsOpen(true)}
+      />
+
+      <TermsModal
+        locale={locale}
+        doc={event.termsDocument}
+        open={termsOpen}
+        onClose={() => setTermsOpen(false)}
+        onAccept={() => setAgreed(true)}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -155,6 +170,13 @@ export function EventView({ slug }: { slug: string }) {
             </ol>
             <h3 className="mt-5 text-sm font-semibold">{t.refundPolicy}</h3>
             <p className="mt-1 text-sm text-muted">{tr(event.refundPolicy, locale)}</p>
+            <button
+              type="button"
+              className="mt-4 rounded-xl border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand-softer"
+              onClick={() => setTermsOpen(true)}
+            >
+              {t.readFullTerms}
+            </button>
           </section>
         </div>
         <section className="card h-fit p-6">

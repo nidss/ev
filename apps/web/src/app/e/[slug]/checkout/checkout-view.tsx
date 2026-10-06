@@ -75,6 +75,7 @@ export function CheckoutView({ slug }: { slug: string }) {
         initialBuyer={order.buyer}
         initialHolders={order.holders}
         initialPromo={promo ? { code: promo.code, label: tr(promo.label, locale) } : null}
+        termsDoc={catalog.event.termsDocument}
       />
     </main>
   );

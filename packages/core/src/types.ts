@@ -30,7 +30,19 @@ export interface EventInfo {
   platformFeeBps: number; // 300 = 3%
   vatRateBps: number; // 700 = 7%
   refundPolicy: I18n;
-  terms: I18n[];
+  terms: I18n[]; // สรุปสั้นที่แสดงบนหน้างาน
+  termsDocument: TermsDocument; // เงื่อนไขฉบับเต็ม (เปิดเป็น modal)
+}
+
+export interface TermsSection {
+  heading: I18n;
+  paragraphs: I18n[];
+}
+
+export interface TermsDocument {
+  title: I18n;
+  updatedAt: string; // YYYY-MM-DD
+  sections: TermsSection[];
 }
 
 export interface TimeSlot {
